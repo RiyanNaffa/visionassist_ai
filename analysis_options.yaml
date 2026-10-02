@@ -1,0 +1,56 @@
+include: package:flutter_lints/flutter.yaml
+
+analyzer:
+  language:
+    strict-casts: true
+    strict-inference: true
+    strict-raw-types: true
+  errors:
+    missing_required_param: error
+    missing_return: error
+    todo: ignore
+  exclude:
+    - '**/*.g.dart'
+    - '**/*.freezed.dart'
+
+linter:
+  rules:
+    # Style
+    - always_declare_return_types
+    - annotate_overrides
+    - avoid_empty_else
+    - avoid_print
+    - avoid_redundant_argument_values
+    - avoid_relative_lib_imports
+    - avoid_return_types_on_setters
+    - avoid_unnecessary_containers
+    - avoid_unused_constructor_parameters
+    - await_only_futures
+    - camel_case_types
+    - cancel_subscriptions
+    - close_sinks
+    - comment_references
+    - constant_identifier_names
+    - directives_ordering
+    - empty_catches
+    - file_names
+    - flutter_style_todos
+    - implementation_imports
+    - library_names
+    - no_duplicate_case_values
+    - no_logic_in_create_state
+    - non_constant_identifier_names
+    - package_names
+    - prefer_const_constructors
+    - prefer_const_declarations
+    - prefer_final_fields
+    - prefer_final_locals
+    - prefer_is_empty
+    - prefer_is_not_empty
+    - prefer_single_quotes
+    - sort_child_properties_last
+    - unnecessary_const
+    - unnecessary_new
+    - unnecessary_null_checks
+    - use_key_in_widget_constructors
+    - use_super_parameters

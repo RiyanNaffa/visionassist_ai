@@ -1,0 +1,52 @@
+name: visionassist_ai
+description: Offline-first assistive camera app for blind and low-vision users in Indonesia.
+version: 1.0.0+1
+publish_to: 'none'
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+  flutter: '>=3.16.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # Camera
+  camera: ^0.11.0+2
+
+  # ML Kit
+  google_mlkit_text_recognition: ^0.13.1
+
+  # TTS & STT
+  flutter_tts: ^4.2.0
+  speech_to_text: ^7.0.0
+
+  # Haptic & audio
+  vibration: ^2.0.0
+  audioplayers: ^6.1.0
+
+  # Permissions
+  permission_handler: ^11.3.1
+
+  # TFLite
+  tflite_flutter: ^0.10.4
+
+  # State management
+  flutter_riverpod: ^2.6.1
+
+  # Utilities
+  path_provider: ^2.1.4
+  http: ^1.2.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+  mocktail: ^1.0.4
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/audio/
+    - assets/models/

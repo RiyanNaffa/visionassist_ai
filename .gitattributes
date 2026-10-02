@@ -1,0 +1,19 @@
+﻿# Normalise line endings to LF in the repository; checkout as-is on all platforms.
+* text=auto eol=lf
+
+# Shell scripts must always be LF (bash breaks on CRLF).
+*.sh text eol=lf
+*.py text eol=lf
+
+# Dart / YAML / Markdown
+*.dart text eol=lf
+*.yaml text eol=lf
+*.yml  text eol=lf
+*.md   text eol=lf
+*.txt  text eol=lf
+
+# Binary assets — never touch line endings.
+*.mp3  binary
+*.tflite binary
+*.png  binary
+*.jpg  binary

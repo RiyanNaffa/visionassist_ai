@@ -51,6 +51,20 @@ class AppStrings {
   static const String ttsNotSure =
       'Saya tidak yakin, silakan tanyakan apoteker.';
 
+  // ── Visual Q&A ────────────────────────────────────────────────────────────
+  /// Announced after the user double-taps in Visual Q&A mode.
+  static const String ttsQaCaptured =
+      'Foto diambil. Tekan lama untuk mengajukan pertanyaan.';
+
+  /// Announced when STT returns no speech (query empty).
+  static const String ttsQaNoSpeech =
+      'Tidak ada suara terdengar. Silakan coba lagi.';
+
+  /// Announced when microphone permission is denied.
+  static const String ttsQaMicDenied =
+      'Izin mikrofon diperlukan untuk bertanya. '
+      'Harap berikan izin di pengaturan perangkat.';
+
   // ── Currency ──────────────────────────────────────────────────────────────
   static const String ttsCurrencyModelMissing =
       'Model pendeteksi uang belum dipasang. '

@@ -87,6 +87,11 @@ class HomeController extends Notifier<HomeState> {
   final StableTextFilter _stableFilter = StableTextFilter();
   bool _liveProcessingBusy = false;
 
+  /// Path of the last photo taken in Visual Q&A mode (mode 3), so that
+  /// [onLongPress] can re-use the same frame the user captured via double-tap
+  /// instead of taking a second, unrelated picture.
+  String? _lastCapturedPath;
+
   // Use cases (initialised lazily in [build])
   late final AnalyzeIngredients _analyzeIngredients;
   late final AnswerVisualQuestion _answerQuestion;
@@ -370,6 +375,12 @@ class HomeController extends Notifier<HomeState> {
         await _audio.play(AudioCueEvent.success);
         await _tts.speak(analysis.summary, interrupt: true);
 
+      case 3: // Visual Q&A — store captured path; user then long-presses to ask
+        _lastCapturedPath = path;
+        state = state.copyWith(statusText: AppStrings.ttsQaCaptured);
+        await _audio.play(AudioCueEvent.success);
+        await _tts.speak(AppStrings.ttsQaCaptured, interrupt: true);
+
       default:
         break;
     }
@@ -387,27 +398,50 @@ class HomeController extends Notifier<HomeState> {
 
     final micStatus = await _permissions.check(AppPermission.microphone);
     if (micStatus != PermissionStatus.granted) {
-      await _permissions.request(AppPermission.microphone);
+      final granted = await _permissions.request(AppPermission.microphone);
+      if (granted != PermissionStatus.granted) {
+        state = state.copyWith(isListeningForQuery: false);
+        await _tts.speak(AppStrings.ttsQaMicDenied, interrupt: true);
+        return;
+      }
     }
 
     String query = '';
+    bool sttDone = false;
+
     await _stt.startListening(
       localeId: 'id-ID',
       onResult: (result) {
-        if (result.isFinal) query = result.text;
+        if (result.isFinal) {
+          query = result.text;
+          sttDone = true;
+        }
       },
     );
 
-    // Wait for STT to finish.
-    await Future<void>.delayed(const Duration(seconds: 10));
+    // Poll until STT signals it's done (isFinal) or 10 s hard cap.
+    const pollInterval = Duration(milliseconds: 100);
+    const maxWait = Duration(seconds: 10);
+    var elapsed = Duration.zero;
+    while (!sttDone && elapsed < maxWait) {
+      await Future<void>.delayed(pollInterval);
+      elapsed += pollInterval;
+    }
     await _stt.stopListening();
     state = state.copyWith(isListeningForQuery: false);
 
-    if (query.trim().isEmpty) return;
+    if (query.trim().isEmpty) {
+      await _tts.speak(AppStrings.ttsQaNoSpeech, interrupt: true);
+      return;
+    }
 
     state = state.copyWith(isProcessing: true);
     try {
-      final path = await _camera.takePicture();
+      // Prefer the photo the user already captured (double-tap); if they
+      // long-press without capturing first, take a new picture now.
+      final path = _lastCapturedPath ?? await _camera.takePicture();
+      _lastCapturedPath = null; // consume once
+
       final ocr = await _recognizeFromFile(path);
       final answer = await _answerQuestion(
         question: query,

@@ -71,7 +71,7 @@ class RgbConverter {
     return rgb;
   }
 
-  /// Bilinear resize of [srcRgb] from (srcW × srcH) to 224 × 224 and
+  /// Bilinear resize of [srcRgb] from (srcW × srcH) to 256 × 256 and
   /// normalise pixel values to [0.0, 1.0].
   static Float32List _resizeAndNormalize(
     Uint8List srcRgb,

@@ -39,8 +39,10 @@ class TfliteCurrencyDetector implements CurrencyDetector {
   /// Initialises the interpreter from the bundled TFLite asset.
   Future<void> initialize() async {
     try {
+      // fromAsset() loads the path as-is via rootBundle, so it must be the full
+      // bundle key (with the `assets/` prefix declared in pubspec.yaml).
       _interpreter = await Interpreter.fromAsset(
-        'models/currency_detector.tflite',
+        'assets/models/currency_detector.tflite',
       );
       _available = true;
 

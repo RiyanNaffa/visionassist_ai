@@ -3,9 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:visionassist_ai/core/constants/app_strings.dart';
-import 'package:visionassist_ai/presentation/screens/home_screen.dart';
-import 'package:visionassist_ai/presentation/controllers/home_controller.dart';
 import 'package:visionassist_ai/core/services/service_providers.dart';
+import 'package:visionassist_ai/presentation/screens/home_screen.dart';
 import 'package:visionassist_ai/core/services/permission_service.dart';
 import 'package:visionassist_ai/core/services/tts_service.dart';
 import 'package:visionassist_ai/core/services/haptic_service.dart';

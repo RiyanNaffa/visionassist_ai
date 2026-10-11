@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 
 import '../../core/constants/app_constants.dart';
-import '../../core/constants/app_strings.dart';
 
 /// Large quadrant button for screen-reader (accessible) mode.
 ///

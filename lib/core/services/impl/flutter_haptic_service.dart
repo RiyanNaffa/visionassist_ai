@@ -43,24 +43,21 @@ class FlutterHapticService implements HapticService {
       await mediumImpact();
       return;
     }
-    final canVibrate = await Vibration.hasVibrator() ?? false;
-    if (canVibrate) {
+    if (await Vibration.hasVibrator()) {
       await Vibration.vibrate(pattern: pattern);
     }
   }
 
   @override
   Future<void> success() async {
-    final canVibrate = await Vibration.hasVibrator() ?? false;
-    if (canVibrate) {
+    if (await Vibration.hasVibrator()) {
       await Vibration.vibrate(pattern: [0, 80, 80, 150]);
     }
   }
 
   @override
   Future<void> error() async {
-    final canVibrate = await Vibration.hasVibrator() ?? false;
-    if (canVibrate) {
+    if (await Vibration.hasVibrator()) {
       await Vibration.vibrate(duration: 400);
     }
   }

@@ -4,7 +4,7 @@ import 'package:flutter/foundation.dart';
 import '../../constants/app_constants.dart';
 import '../audio_cue_service.dart';
 
-/// [AudioPlayers]-backed [AudioCueService].
+/// `audioplayers`-backed [AudioCueService].
 ///
 /// Each cue has a dedicated [AudioPlayer] to support overlapping playback
 /// (low-latency mixing mode).
@@ -16,16 +16,12 @@ class AudioplayersAudioCueService implements AudioCueService {
         // `ambient` would be ideal but does NOT support mixWithOthers per the
         // AVAudioSession contract — use `playback` which does.
         iOS: AudioContextIOS(
-          category: AVAudioSessionCategory.playback,
-          options: {AVAudioSessionOptions.mixWithOthers},
+          options: const {AVAudioSessionOptions.mixWithOthers},
         ),
-        android: AudioContextAndroid(
+        android: const AudioContextAndroid(
           audioFocus: AndroidAudioFocus.gainTransientMayDuck,
-          isSpeakerphoneOn: false,
-          stayAwake: false,
           contentType: AndroidContentType.sonification,
           usageType: AndroidUsageType.assistanceSonification,
-          audioMode: AndroidAudioMode.normal,
         ),
       ),
     );

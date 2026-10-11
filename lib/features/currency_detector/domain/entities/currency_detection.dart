@@ -44,6 +44,5 @@ class CurrencyDetectionResult {
 
   /// Unique set of denomination labels present in this frame, sorted
   /// ascending (e.g. `{'1000', '20000'}`).
-  Set<String> get detectedLabels =>
-      detections.map((d) => d.classLabel).toSet();
+  Set<String> get detectedLabels => detections.map((d) => d.classLabel).toSet();
 }

@@ -12,7 +12,7 @@ void main() {
     });
 
     test('removes punctuation except sentence terminators', () {
-      expect(TextNormalizer.normalize('hello, world!'), 'hello  world!');
+      expect(TextNormalizer.normalize('hello, world!'), 'hello world!');
     });
 
     test('trims leading and trailing whitespace', () {

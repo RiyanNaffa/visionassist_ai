@@ -1,5 +1,4 @@
 import 'dart:math' as math;
-import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
 import 'package:tflite_flutter/tflite_flutter.dart';
@@ -89,12 +88,15 @@ class TfliteCurrencyDetector implements CurrencyDetector {
         final numAttrs = outputShape[1]; // e.g. 4+7=11 for 7 classes
         final numDetections = outputShape[2];
         final outputBuffer = [
-          List.generate(numAttrs, (_) => List<double>.filled(numDetections, 0.0)),
+          List.generate(
+              numAttrs, (_) => List<double>.filled(numDetections, 0.0)),
         ];
         _interpreter!.runForMultipleInputs([inputNested], {0: outputBuffer});
-        candidates = _filterByConfidenceTransposed(outputBuffer[0], numDetections);
+        candidates =
+            _filterByConfidenceTransposed(outputBuffer[0], numDetections);
       } else {
-        debugPrint('[CurrencyDetector] ⚠ Unexpected output shape: $outputShape');
+        debugPrint(
+            '[CurrencyDetector] ⚠ Unexpected output shape: $outputShape');
         return const CurrencyDetectionResult(detections: []);
       }
     } catch (e) {
@@ -202,9 +204,8 @@ class TfliteCurrencyDetector implements CurrencyDetector {
     final kept = <_RawDetection>[];
 
     for (var cls = 0; cls < _kClasses.length; cls++) {
-      final forClass =
-          detections.where((d) => d.classIdx == cls).toList()
-            ..sort((a, b) => b.confidence.compareTo(a.confidence));
+      final forClass = detections.where((d) => d.classIdx == cls).toList()
+        ..sort((a, b) => b.confidence.compareTo(a.confidence));
 
       final suppressed = List<bool>.filled(forClass.length, false);
 
@@ -226,24 +227,24 @@ class TfliteCurrencyDetector implements CurrencyDetector {
   /// Sorts detections by denomination value ascending, then by confidence
   /// descending so callers get a stable, readable list.
   List<DetectedBanknote> _sortByDenomination(List<_RawDetection> raw) {
-    final list =
-        raw.map((d) {
-          return DetectedBanknote(
-            classLabel: _kClasses[d.classIdx],
-            confidence: d.confidence,
-            cx: d.cx,
-            cy: d.cy,
-            width: d.w,
-            height: d.h,
-          );
-        }).toList();
+    final list = raw.map((d) {
+      return DetectedBanknote(
+        classLabel: _kClasses[d.classIdx],
+        confidence: d.confidence,
+        cx: d.cx,
+        cy: d.cy,
+        width: d.w,
+        height: d.h,
+      );
+    }).toList();
 
     list.sort((a, b) {
       final va = int.tryParse(a.classLabel) ?? 0;
       final vb = int.tryParse(b.classLabel) ?? 0;
       final cmp = va.compareTo(vb);
       if (cmp != 0) return cmp;
-      return b.confidence.compareTo(a.confidence); // tie-break: higher conf first
+      return b.confidence
+          .compareTo(a.confidence); // tie-break: higher conf first
     });
 
     return list;

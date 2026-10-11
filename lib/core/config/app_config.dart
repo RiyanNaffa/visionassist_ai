@@ -9,7 +9,6 @@ class AppConfig {
   /// Empty = remote features disabled.
   static const String apiProxyUrl = String.fromEnvironment(
     'API_PROXY_URL',
-    defaultValue: '',
   );
 
   /// Shared secret sent to the proxy as `X-API-Key`. Same value as
@@ -19,13 +18,11 @@ class AppConfig {
   /// real credential. The LLM key never leaves the backend.
   static const String proxyApiKey = String.fromEnvironment(
     'PROXY_API_KEY',
-    defaultValue: '',
   );
 
   /// Whether to use the backend for Q&A and ingredient summaries.
   static const bool enableRemoteQa = bool.fromEnvironment(
     'ENABLE_REMOTE_QA',
-    defaultValue: false,
   );
 
   /// Seconds to wait for the backend before falling back to on-device logic.

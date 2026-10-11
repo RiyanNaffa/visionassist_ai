@@ -30,8 +30,10 @@ class SttSpeechToTextService implements SpeechToTextService {
     }
 
     await _stt.listen(
-      localeId: localeId,
-      listenFor: listenFor,
+      listenOptions: stt.SpeechListenOptions(
+        localeId: localeId,
+        listenFor: listenFor,
+      ),
       onResult: (result) => onResult(
         SpeechResult(
           text: result.recognizedWords,

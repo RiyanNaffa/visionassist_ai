@@ -28,15 +28,13 @@ class AppStrings {
   static const String hintSingleTap = 'Ketuk untuk jeda atau lanjutkan';
 
   // ── Permissions ───────────────────────────────────────────────────────────
-  static const String permissionCameraTitle =
-      'Izin Kamera Diperlukan';
+  static const String permissionCameraTitle = 'Izin Kamera Diperlukan';
   static const String permissionCameraMessage =
       'VisionAssist AI memerlukan akses kamera untuk membaca teks, '
       'mendeteksi uang, dan menjawab pertanyaan visual.';
   static const String permissionCameraRetry = 'Coba Lagi';
   static const String permissionCameraSettings = 'Buka Pengaturan';
-  static const String permissionMicTitle =
-      'Izin Mikrofon Diperlukan';
+  static const String permissionMicTitle = 'Izin Mikrofon Diperlukan';
   static const String permissionMicMessage =
       'Izin mikrofon dibutuhkan untuk fitur Tanya Gambar dengan suara.';
 

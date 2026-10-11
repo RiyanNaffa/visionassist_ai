@@ -17,7 +17,10 @@ final proxyClientProvider = Provider<ProxyClient?>((ref) {
   final client = ProxyClient(
     baseUrl: AppConfig.apiProxyUrl,
     apiKey: AppConfig.proxyApiKey,
-    timeout: Duration(seconds: AppConfig.remoteTimeoutSeconds),
+    // Not redundant: the analyzer folds `int.fromEnvironment` to its default
+    // (20), but at build time REMOTE_TIMEOUT_SECONDS may override it.
+    // ignore: avoid_redundant_argument_values
+    timeout: const Duration(seconds: AppConfig.remoteTimeoutSeconds),
   );
   ref.onDispose(client.close);
   return client;

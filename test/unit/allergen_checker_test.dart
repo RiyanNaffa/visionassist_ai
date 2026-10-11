@@ -121,4 +121,54 @@ void main() {
       expect(result.detected, contains('Telur'));
     });
   });
+
+  group('AllergenChecker - negation', () {
+    test('"X free" after the allergen is a negation', () {
+      for (final text in [
+        'gluten free product',
+        'Gluten-free snack',
+        'lactose-free milk',
+        'dairy free',
+      ]) {
+        final result = AllergenChecker.check(text);
+        expect(result.detected, isEmpty, reason: text);
+        expect(result.negated, isNotEmpty, reason: text);
+      }
+    });
+
+    test('"non-dairy" is a negation', () {
+      final result = AllergenChecker.check('non-dairy creamer');
+      expect(result.negated, contains('Susu'));
+      expect(result.detected, isNot(contains('Susu')));
+    });
+
+    test('a negation does not reach into the next sentence', () {
+      final result = AllergenChecker.check('Bebas pengawet. Mengandung susu.');
+      expect(result.detected, contains('Susu'));
+      expect(result.negated, isNot(contains('Susu')));
+    });
+
+    test('a negation does not reach across a line break', () {
+      final result = AllergenChecker.check('Tanpa pewarna\nMengandung telur');
+      expect(result.detected, contains('Telur'));
+    });
+
+    test('negation still applies within one sentence', () {
+      final result = AllergenChecker.check('Tanpa pewarna, bebas gluten');
+      expect(result.negated, contains('Gluten'));
+    });
+
+    test('an allergen stated both ways is reported as detected', () {
+      final result = AllergenChecker.check(
+        'Bebas gluten. Dibuat dari tepung gandum.',
+      );
+      expect(result.detected, contains('Gluten'));
+      expect(result.negated, isNot(contains('Gluten')));
+    });
+
+    test('a later positive mention beats an earlier negated one', () {
+      final result = AllergenChecker.check('no milk added. contains milk.');
+      expect(result.detected, contains('Susu'));
+    });
+  });
 }

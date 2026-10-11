@@ -1,22 +1,22 @@
 import 'package:camera/camera.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'camera_service.dart';
-import 'text_recognition_service.dart';
-import 'tts_service.dart';
-import 'haptic_service.dart';
-import 'audio_cue_service.dart';
-import 'speech_to_text_service.dart';
-import 'permission_service.dart';
-import 'impl/flutter_camera_service.dart';
-import 'impl/mlkit_text_recognition_service.dart';
-import 'impl/flutter_tts_service.dart';
-import 'impl/flutter_haptic_service.dart';
-import 'impl/audioplayers_audio_cue_service.dart';
-import 'impl/stt_speech_to_text_service.dart';
-import 'impl/ph_permission_service.dart';
 import '../../features/currency_detector/data/tflite_currency_detector.dart';
 import '../../features/currency_detector/domain/repositories/currency_detector.dart';
+import 'audio_cue_service.dart';
+import 'camera_service.dart';
+import 'haptic_service.dart';
+import 'impl/audioplayers_audio_cue_service.dart';
+import 'impl/flutter_camera_service.dart';
+import 'impl/flutter_haptic_service.dart';
+import 'impl/flutter_tts_service.dart';
+import 'impl/mlkit_text_recognition_service.dart';
+import 'impl/ph_permission_service.dart';
+import 'impl/stt_speech_to_text_service.dart';
+import 'permission_service.dart';
+import 'speech_to_text_service.dart';
+import 'text_recognition_service.dart';
+import 'tts_service.dart';
 
 /// Riverpod providers for all core services.
 ///
@@ -62,7 +62,7 @@ final permissionServiceProvider = Provider<PermissionService>(
 
 /// The YOLO banknote detector.
 ///
-/// Initialisation is fire-and-forget; the detector exposes [isAvailable]
+/// Initialisation is fire-and-forget; the detector exposes `isAvailable`
 /// so callers can check readiness without blocking the UI.
 final currencyDetectorProvider = Provider<CurrencyDetector>((ref) {
   final detector = TfliteCurrencyDetector();

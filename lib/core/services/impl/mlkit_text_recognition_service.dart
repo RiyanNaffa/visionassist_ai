@@ -10,8 +10,7 @@ import '../text_recognition_service.dart';
 ///
 /// Performs Latin-script OCR via [TextRecognizer].
 class MlKitTextRecognitionService implements TextRecognitionService {
-  MlKitTextRecognitionService()
-      : _recognizer = TextRecognizer(script: TextRecognitionScript.latin);
+  MlKitTextRecognitionService() : _recognizer = TextRecognizer();
 
   final TextRecognizer _recognizer;
 

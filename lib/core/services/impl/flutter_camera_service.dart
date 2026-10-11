@@ -35,9 +35,8 @@ class FlutterCameraService implements CameraService {
       orElse: () => cameras.first,
     );
 
-    final format = Platform.isAndroid
-        ? ImageFormatGroup.nv21
-        : ImageFormatGroup.bgra8888;
+    final format =
+        Platform.isAndroid ? ImageFormatGroup.nv21 : ImageFormatGroup.bgra8888;
 
     _controller = CameraController(
       back,

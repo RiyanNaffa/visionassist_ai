@@ -1,5 +1,5 @@
-import 'dart:typed_data';
 import 'dart:math' as math;
+import 'dart:typed_data';
 
 /// Converts a raw YUV (NV21) or BGRA camera buffer to a flat Float32List
 /// representing a 256 × 256 RGB image normalised to 0–1.
@@ -98,8 +98,7 @@ class RgbConverter {
           final p10 = srcRgb[(y0 * srcW + x1) * 3 + c];
           final p01 = srcRgb[(y1 * srcW + x0) * 3 + c];
           final p11 = srcRgb[(y1 * srcW + x1) * 3 + c];
-          final value =
-              p00 * (1 - dx) * (1 - dy) +
+          final value = p00 * (1 - dx) * (1 - dy) +
               p10 * dx * (1 - dy) +
               p01 * (1 - dx) * dy +
               p11 * dx * dy;

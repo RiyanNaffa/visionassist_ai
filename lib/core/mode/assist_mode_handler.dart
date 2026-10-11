@@ -1,3 +1,6 @@
+import 'package:visionassist_ai/core/services/camera_service.dart'
+    show CameraFrame;
+
 /// Output produced by an [AssistModeHandler] after processing.
 class ModeOutput {
   const ModeOutput({

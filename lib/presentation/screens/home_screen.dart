@@ -4,8 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/constants/app_constants.dart';
 import '../../core/constants/app_strings.dart';
-import '../../core/services/service_providers.dart';
 import '../../core/services/impl/flutter_camera_service.dart';
+import '../../core/services/service_providers.dart';
 import '../controllers/home_controller.dart';
 import '../widgets/mode_status_banner.dart';
 import '../widgets/quadrant_button.dart';
@@ -219,9 +219,9 @@ class _PermissionDeniedScreen extends StatelessWidget {
             children: [
               Semantics(
                 label: AppStrings.permissionCameraTitle,
-                child: Text(
+                child: const Text(
                   AppStrings.permissionCameraTitle,
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: AppColors.primary,
                     fontSize: 22,
                     fontWeight: FontWeight.bold,
@@ -232,9 +232,9 @@ class _PermissionDeniedScreen extends StatelessWidget {
               const SizedBox(height: 16),
               Semantics(
                 label: AppStrings.permissionCameraMessage,
-                child: Text(
+                child: const Text(
                   AppStrings.permissionCameraMessage,
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: AppColors.onBackground,
                     fontSize: 16,
                   ),

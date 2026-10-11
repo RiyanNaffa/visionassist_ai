@@ -4,7 +4,7 @@ import 'package:visionassist_ai/features/visual_qa/domain/repositories/qa_reposi
 /// Local keyword-retrieval [QaRepository].
 ///
 /// **Safety rule**: answers are grounded only in text actually found in
-/// [ocrText].  Medicine questions without supporting text return the
+/// the OCR text.  Medicine questions without supporting text return the
 /// standardised safe-fallback phrase.  This implementation never infers
 /// or invents dosage information.
 ///
@@ -22,7 +22,8 @@ class LocalQaRepository implements QaRepository {
       'Saya tidak menemukan jawabannya di teks yang terbaca.';
 
   /// Non-medicine question but nothing was recognised in the image.
-  static const String _noTextFallback = 'Saya tidak menemukan teks pada gambar.';
+  static const String _noTextFallback =
+      'Saya tidak menemukan teks pada gambar.';
 
   /// Medicine-related keyword triggers.
   static final List<RegExp> _medicineTriggers = [
@@ -54,6 +55,48 @@ class LocalQaRepository implements QaRepository {
     RegExp(r'\bdescribe\b', caseSensitive: false),
   ];
 
+  /// Words that say nothing about *which* sentence answers the question.
+  static const Set<String> _stopwords = {
+    // Indonesian
+    'apa', 'apakah', 'ini', 'itu', 'yang', 'dan', 'atau', 'dari', 'ada',
+    'adalah', 'dengan', 'untuk', 'pada', 'dalam', 'saya', 'aku', 'kamu',
+    'anda', 'tolong', 'berapa', 'kapan', 'siapa', 'mana', 'bagaimana',
+    'mengapa',
+    // English
+    'what', 'the', 'this', 'that', 'are', 'and', 'how', 'when', 'where',
+    'who', 'why', 'does', 'did',
+  };
+
+  /// The question asks *when* the product expires.
+  static final RegExp _asksExpiry = RegExp(
+    r'\b(?:kadaluarsa|kedaluwarsa|kedaluarsa|kadaluwarsa|expired?|exp|expiry'
+    r'|tanggal)(?:nya)?\b',
+    caseSensitive: false,
+  );
+
+  /// The question asks about the price.
+  static final RegExp _asksPrice = RegExp(
+    r'\b(?:harga|price|bayar|rp)(?:nya)?\b',
+    caseSensitive: false,
+  );
+
+  /// Drops the Indonesian possessive suffix "-nya" ("harganya" → "harga") so
+  /// it does not stop a question word from matching the label.
+  static String _stem(String word) => word.length > 5 && word.endsWith('nya')
+      ? word.substring(0, word.length - 3)
+      : word;
+
+  /// A date such as `01/01/2026`, `12/2026` or `10-2027` (not `15.000`).
+  static final RegExp _dateLike =
+      RegExp(r'\b\d{1,2}[/\-]\d{1,4}(?:[/\-]\d{2,4})?\b');
+
+  /// A price such as `Rp 15.000` or `IDR15000`.
+  static final RegExp _priceLike =
+      RegExp(r'\b(?:rp|idr)\.?\s*\d', caseSensitive: false);
+
+  /// How many points a sentence gets for answering the *kind* of question.
+  static const int _intentBoost = 2;
+
   @override
   Future<QaAnswer> answer({
     required String question,
@@ -80,8 +123,10 @@ class LocalQaRepository implements QaRepository {
     }
 
     // Split OCR text into sentences for retrieval.
+    // Split after sentence punctuation + whitespace (never inside "15.000")
+    // or at line breaks.
     final sentences = ocrText
-        .split(RegExp(r'(?<=[.?!\n])\s*'))
+        .split(RegExp(r'(?<=[.?!])\s+|\n+'))
         .map((s) => s.trim())
         .where((s) => s.isNotEmpty)
         .toList();
@@ -90,16 +135,25 @@ class LocalQaRepository implements QaRepository {
     final questionWords = question
         .toLowerCase()
         .split(RegExp(r'\W+'))
-        .where((w) => w.length > 2)
+        .where((w) => w.length > 2 && !_stopwords.contains(w))
+        .map(_stem)
         .toSet();
+    final asksExpiry = _asksExpiry.hasMatch(question);
+    final asksPrice = _asksPrice.hasMatch(question);
 
     String? bestSentence;
     var bestScore = 0;
 
     for (final sentence in sentences) {
       final sentenceLower = sentence.toLowerCase();
-      final score =
-          questionWords.where((w) => sentenceLower.contains(w)).length;
+      final words = sentenceLower.split(RegExp(r'\W+')).map(_stem).toSet();
+      var score = questionWords.where(words.contains).length;
+      if (asksExpiry && _dateLike.hasMatch(sentenceLower)) {
+        score += _intentBoost;
+      }
+      if (asksPrice && _priceLike.hasMatch(sentenceLower)) {
+        score += _intentBoost;
+      }
       if (score > bestScore) {
         bestScore = score;
         bestSentence = sentence;

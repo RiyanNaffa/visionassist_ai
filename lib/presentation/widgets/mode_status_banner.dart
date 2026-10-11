@@ -29,8 +29,7 @@ class ModeStatusBanner extends StatelessWidget {
           children: [
             // Mode pill
             Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
                 color: AppColors.primary,
                 borderRadius: BorderRadius.circular(20),
@@ -48,8 +47,7 @@ class ModeStatusBanner extends StatelessWidget {
               const SizedBox(height: 8),
               const LinearProgressIndicator(
                 backgroundColor: AppColors.border,
-                valueColor:
-                    AlwaysStoppedAnimation<Color>(AppColors.primary),
+                valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
               ),
             ] else if (state.statusText.isNotEmpty) ...[
               const SizedBox(height: 8),
@@ -69,8 +67,8 @@ class ModeStatusBanner extends StatelessWidget {
             ],
             if (state.isListeningForQuery) ...[
               const SizedBox(height: 8),
-              Row(
-                children: const [
+              const Row(
+                children: [
                   Icon(Icons.mic, color: AppColors.primary, size: 20),
                   SizedBox(width: 6),
                   Text(

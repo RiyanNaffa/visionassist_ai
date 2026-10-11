@@ -1,17 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-
 import 'package:visionassist_ai/core/constants/app_strings.dart';
-import 'package:visionassist_ai/core/services/service_providers.dart';
-import 'package:visionassist_ai/presentation/screens/home_screen.dart';
-import 'package:visionassist_ai/core/services/permission_service.dart';
-import 'package:visionassist_ai/core/services/tts_service.dart';
-import 'package:visionassist_ai/core/services/haptic_service.dart';
 import 'package:visionassist_ai/core/services/audio_cue_service.dart';
 import 'package:visionassist_ai/core/services/camera_service.dart';
-import 'package:visionassist_ai/core/services/text_recognition_service.dart';
+import 'package:visionassist_ai/core/services/haptic_service.dart';
+import 'package:visionassist_ai/core/services/permission_service.dart';
+import 'package:visionassist_ai/core/services/service_providers.dart';
 import 'package:visionassist_ai/core/services/speech_to_text_service.dart';
+import 'package:visionassist_ai/core/services/text_recognition_service.dart';
+import 'package:visionassist_ai/core/services/tts_service.dart';
+import 'package:visionassist_ai/presentation/screens/home_screen.dart';
 
 // ── Fakes ──────────────────────────────────────────────────────────────────
 

@@ -1,5 +1,4 @@
-import 'package:permission_handler/permission_handler.dart'
-    as ph;
+import 'package:permission_handler/permission_handler.dart' as ph;
 
 import '../permission_service.dart';
 

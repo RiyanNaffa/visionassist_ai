@@ -35,8 +35,7 @@ class StableTextFilter {
       return false;
     }
 
-    final prevSimilarity =
-        TextNormalizer.similarity(_history.last, text);
+    final prevSimilarity = TextNormalizer.similarity(_history.last, text);
 
     if (prevSimilarity < similarityThreshold) {
       // Sequence broken — restart.

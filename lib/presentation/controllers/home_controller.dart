@@ -1,3 +1,4 @@
+import 'package:camera/camera.dart' show CameraController;
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -7,15 +8,15 @@ import '../../core/services/camera_service.dart';
 import '../../core/services/haptic_service.dart';
 import '../../core/services/permission_service.dart';
 import '../../core/services/service_providers.dart';
-import '../../core/services/tts_service.dart';
-import '../../core/services/text_recognition_service.dart';
 import '../../core/services/speech_to_text_service.dart';
+import '../../core/services/text_recognition_service.dart';
+import '../../core/services/tts_service.dart';
 import '../../core/utils/rgb_converter.dart';
 import '../../core/utils/stable_text_filter.dart';
 import '../../features/currency_detector/domain/usecases/detect_currency.dart';
+import '../../features/ingredient_analyzer/domain/usecases/analyze_ingredients.dart';
 import '../../features/text_reader/data/text_reader_repository_impl.dart';
 import '../../features/text_reader/domain/usecases/recognize_text_from_file.dart';
-import '../../features/ingredient_analyzer/domain/usecases/analyze_ingredients.dart';
 import '../../features/visual_qa/domain/usecases/answer_visual_question.dart';
 import '../providers/repository_providers.dart';
 
@@ -207,7 +208,7 @@ class HomeController extends Notifier<HomeState> {
         _stableFilter.markSpoken(result.text);
         state = state.copyWith(statusText: result.text);
         await _audio.play(AudioCueEvent.beep);
-        await _tts.speak(result.text, interrupt: false);
+        await _tts.speak(result.text);
       }
     } else if (state.modeIndex == 1) {
       // ── Currency Detector ─────────────────────────────────────────────────
@@ -275,15 +276,13 @@ class HomeController extends Notifier<HomeState> {
     _lastSpokenLabels = Set.unmodifiable(currentLabels);
 
     // Build spoken text: unique denominations, ascending order, joined by comma.
-    final sortedLabels =
-        currentLabels.toList()
-          ..sort((a, b) => (int.tryParse(a) ?? 0).compareTo(int.tryParse(b) ?? 0));
+    final sortedLabels = currentLabels.toList()
+      ..sort((a, b) => (int.tryParse(a) ?? 0).compareTo(int.tryParse(b) ?? 0));
 
-    final speechParts =
-        sortedLabels
-            .map(AppStrings.currencySpeech)
-            .whereType<String>()
-            .toList();
+    final speechParts = sortedLabels
+        .map(AppStrings.currencySpeech)
+        .whereType<String>()
+        .toList();
 
     if (speechParts.isEmpty) return;
 
@@ -301,9 +300,8 @@ class HomeController extends Notifier<HomeState> {
   }
 
   Future<void> previousMode() async {
-    final prev =
-        (state.modeIndex - 1 + AppStrings.modeNames.length) %
-            AppStrings.modeNames.length;
+    final prev = (state.modeIndex - 1 + AppStrings.modeNames.length) %
+        AppStrings.modeNames.length;
     await _switchMode(prev);
   }
 
@@ -410,7 +408,6 @@ class HomeController extends Notifier<HomeState> {
     bool sttDone = false;
 
     await _stt.startListening(
-      localeId: 'id-ID',
       onResult: (result) {
         if (result.isFinal) {
           query = result.text;

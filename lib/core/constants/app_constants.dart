@@ -20,8 +20,8 @@ class AppColors {
 class AppAudioAssets {
   AppAudioAssets._();
 
-  static const String beep = 'assets/audio/beep.mp3';
-  static const String success = 'assets/audio/success.mp3';
-  static const String modeSwitch = 'assets/audio/mode_switch.mp3';
-  static const String error = 'assets/audio/error.mp3';
+  static const String beep = 'assets/audio/beep.wav';
+  static const String success = 'assets/audio/success.wav';
+  static const String modeSwitch = 'assets/audio/mode_switch.wav';
+  static const String error = 'assets/audio/error.wav';
 }

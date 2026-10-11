@@ -1,11 +1,22 @@
-# Currency Classifier Model Contract
+# Currency Detector Model Contract
 
-Place the following files in this directory before building:
+Place the following file in this directory before building:
 
 | File | Description |
 |------|-------------|
-| `currency_classifier.tflite` | TFLite model (see contract below) |
-| `currency_labels.txt` | One label per line, matching model output order |
+| `currency_detector.tflite` | TFLite YOLO detection model (see contract below) |
+
+> **No labels file needed.** Class indices are hard-coded in the detector
+> (see `AppConstants.currencyClasses`).
+
+---
+
+## Model
+
+| Property | Value |
+|----------|-------|
+| Architecture | YOLO v2.6 (end-to-end, single-stage) |
+| Task | Object detection |
 
 ---
 
@@ -13,7 +24,7 @@ Place the following files in this directory before building:
 
 | Property | Value |
 |----------|-------|
-| Shape | `[1, 224, 224, 3]` |
+| Shape | `[1, 256, 256, 3]` |
 | Dtype | `float32` |
 | Value range | `0.0 – 1.0` (normalised RGB) |
 | Channel order | RGB (not BGR) |
@@ -25,86 +36,77 @@ The preprocessing pipeline is implemented in pure Dart:
 
 ## Model Output
 
+The model outputs a single tensor in YOLO end-to-end format:
+
 | Property | Value |
 |----------|-------|
-| Shape | `[1, N]` where N = number of labels |
+| Shape | `[1, num_detections, 6]` |
 | Dtype | `float32` |
-| Activation | Softmax (probabilities sum to 1) |
+| Layout per row | `[cx, cy, w, h, confidence, class_id]` |
 
-A prediction is announced only when `confidence ≥ 0.85` across
-**3 consecutive frames**.
+- `cx`, `cy`, `w`, `h` are normalised to `[0.0, 1.0]` relative to the
+  256 × 256 input.
+- `confidence` is a `float32` in `[0.0, 1.0]`.
+- `class_id` is a `float32` integer index into `AppConstants.currencyClasses`.
+- Rows with `confidence < 0.5` are filtered out before NMS.
 
----
-
-## Labels file (`currency_labels.txt`)
-
-One label per line, zero-indexed to match the output tensor.  
-Format: `{CURRENCY_CODE}_{DENOMINATION_VALUE}`
-
-### Required coverage
-
-**Indonesian Rupiah (IDR) — 2016 & 2022 emissions:**
-
-```
-IDR_1000
-IDR_2000
-IDR_5000
-IDR_10000
-IDR_20000
-IDR_50000
-IDR_100000
-```
-
-**US Dollar (USD):**
-
-```
-USD_1
-USD_5
-USD_10
-USD_20
-USD_50
-USD_100
-```
+Post-processing (NMS threshold 0.45, confidence threshold 0.50) and label
+mapping are fully handled in `TfliteCurrencyDetector`.
 
 ---
 
-## Spoken output format
+## Classes
 
-Labels are mapped to Indonesian spoken text in
-`lib/features/currency_detector/presentation/` via `_labelToSpeech()`:
+Seven classes, **zero-indexed**, Indonesian Rupiah only:
 
-| Label | Spoken text |
+| Index | Class |
+|-------|-------|
+| 0 | `1000` |
+| 1 | `2000` |
+| 2 | `5000` |
+| 3 | `10000` |
+| 4 | `20000` |
+| 5 | `50000` |
+| 6 | `100000` |
+
+---
+
+## Spoken output
+
+Detections are mapped to Indonesian TTS in
+`lib/core/constants/app_strings.dart` via `AppStrings.currencySpeech`:
+
+| Class | Spoken text |
 |-------|-------------|
-| `IDR_1000` | "Seribu Rupiah" |
-| `IDR_2000` | "Dua ribu Rupiah" |
-| `IDR_5000` | "Lima ribu Rupiah" |
-| `IDR_10000` | "Sepuluh ribu Rupiah" |
-| `IDR_20000` | "Dua puluh ribu Rupiah" |
-| `IDR_50000` | "Lima puluh ribu Rupiah" |
-| `IDR_100000` | "Seratus ribu Rupiah" |
-| `USD_1` | "Satu Dolar Amerika" |
-| `USD_5` | "Lima Dolar Amerika" |
-| `USD_10` | "Sepuluh Dolar Amerika" |
-| `USD_20` | "Dua puluh Dolar Amerika" |
-| `USD_50` | "Lima puluh Dolar Amerika" |
-| `USD_100` | "Seratus Dolar Amerika" |
+| `1000` | "Seribu Rupiah" |
+| `2000` | "Dua ribu Rupiah" |
+| `5000` | "Lima ribu Rupiah" |
+| `10000` | "Sepuluh ribu Rupiah" |
+| `20000` | "Dua puluh ribu Rupiah" |
+| `50000` | "Lima puluh ribu Rupiah" |
+| `100000` | "Seratus ribu Rupiah" |
+
+When multiple denominations are detected in the same frame, they are
+announced in ascending denomination order, joined with a comma:
+*"Seribu Rupiah, Dua ribu Rupiah"*.
+
+A new announcement is only made when the **set** of detected denominations
+changes from the previous spoken frame.
 
 ---
 
-## Training recommendations
+## Training
 
-- Minimum 500 images per denomination per emission year.
-- Data augmentation: rotation ±15°, brightness ±30%, perspective warp.
-- Validate on held-out set; target top-1 accuracy ≥ 95%.
-- Export with `tf.lite.TFLiteConverter.from_saved_model()` with
-  `DEFAULT` or `FLOAT16` optimisation.
+`ml/train_currency_detector.ipynb` (Google Colab, GPU) trains YOLOv8n on the
+IDR dataset, exports to TFLite (float16, int8 fallback) and verifies the
+output contract above before you copy the file here.
 
 ---
 
 ## Without the model
 
-If `currency_classifier.tflite` is absent, the app uses
-`UnavailableCurrencyClassifier` which announces once:  
+If `currency_detector.tflite` is absent, the app uses
+`UnavailableCurrencyDetector` which announces once:
 *"Model pendeteksi uang belum dipasang."*
 
 No crash occurs.

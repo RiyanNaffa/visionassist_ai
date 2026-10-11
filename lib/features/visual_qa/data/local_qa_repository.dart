@@ -1,5 +1,5 @@
-import '../../domain/entities/qa_answer.dart';
-import '../../domain/repositories/qa_repository.dart';
+import 'package:visionassist_ai/features/visual_qa/domain/entities/qa_answer.dart';
+import 'package:visionassist_ai/features/visual_qa/domain/repositories/qa_repository.dart';
 
 /// Local keyword-retrieval [QaRepository].
 ///

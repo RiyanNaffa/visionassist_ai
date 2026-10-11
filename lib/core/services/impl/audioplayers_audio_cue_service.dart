@@ -11,7 +11,7 @@ import '../audio_cue_service.dart';
 class AudioplayersAudioCueService implements AudioCueService {
   AudioplayersAudioCueService() {
     AudioPlayer.global.setAudioContext(
-      const AudioContext(
+      AudioContext(
         iOS: AudioContextIOS(
           category: AVAudioSessionCategory.ambient,
           options: {AVAudioSessionOptions.mixWithOthers},

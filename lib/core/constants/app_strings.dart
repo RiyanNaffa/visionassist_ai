@@ -52,10 +52,24 @@ class AppStrings {
       'Saya tidak yakin, silakan tanyakan apoteker.';
 
   // ── Currency ──────────────────────────────────────────────────────────────
-  static const String ttsCurrencyPrefix = '';
   static const String ttsCurrencyModelMissing =
       'Model pendeteksi uang belum dipasang. '
       'Silakan ikuti petunjuk di README untuk menambahkan model.';
+
+  /// Maps a denomination class label (e.g. `'20000'`) to its Indonesian
+  /// spoken form.  Returns `null` for unknown labels.
+  static String? currencySpeech(String classLabel) =>
+      _currencySpeechMap[classLabel];
+
+  static const Map<String, String> _currencySpeechMap = {
+    '1000': 'Seribu Rupiah',
+    '2000': 'Dua ribu Rupiah',
+    '5000': 'Lima ribu Rupiah',
+    '10000': 'Sepuluh ribu Rupiah',
+    '20000': 'Dua puluh ribu Rupiah',
+    '50000': 'Lima puluh ribu Rupiah',
+    '100000': 'Seratus ribu Rupiah',
+  };
 
   // ── Ingredient / allergen ─────────────────────────────────────────────────
   static const String ttsAllergenPrefix = 'Mengandung: ';

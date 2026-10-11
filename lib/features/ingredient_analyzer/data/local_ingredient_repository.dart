@@ -1,6 +1,6 @@
-import '../../../../core/utils/allergen_checker.dart';
-import '../../domain/entities/ingredient_analysis.dart';
-import '../../domain/repositories/ingredient_repository.dart';
+import 'package:visionassist_ai/core/utils/allergen_checker.dart';
+import 'package:visionassist_ai/features/ingredient_analyzer/domain/entities/ingredient_analysis.dart';
+import 'package:visionassist_ai/features/ingredient_analyzer/domain/repositories/ingredient_repository.dart';
 
 /// Local rule-based [IngredientRepository] implementation.
 ///

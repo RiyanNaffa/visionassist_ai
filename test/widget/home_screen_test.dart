@@ -146,7 +146,6 @@ void main() {
       await tester.pump();
 
       final btn = find.text(AppStrings.permissionCameraRetry);
-      final size = tester.getSize(btn.evaluate().first);
       // Button itself; its ancestor ElevatedButton with minimumSize(height:72).
       final ancestor = find.ancestor(
         of: btn,

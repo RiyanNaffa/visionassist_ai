@@ -4,7 +4,7 @@ import 'package:visionassist_ai/core/utils/rgb_converter.dart';
 
 void main() {
   group('RgbConverter.fromBgra', () {
-    test('output length is 224*224*3', () {
+    test('output length is 256*256*3', () {
       final width = 4;
       final height = 4;
       // BGRA: B=255, G=0, R=0, A=255 (pure blue in BGRA)
@@ -16,7 +16,7 @@ void main() {
         bytes[i * 4 + 3] = 255; // A
       }
       final result = RgbConverter.fromBgra(bytes, width, height);
-      expect(result.length, equals(224 * 224 * 3));
+      expect(result.length, equals(256 * 256 * 3));
     });
 
     test('values are normalised between 0 and 1', () {
@@ -52,13 +52,13 @@ void main() {
   });
 
   group('RgbConverter.fromNv21', () {
-    test('output length is 224*224*3', () {
+    test('output length is 256*256*3', () {
       final width = 4;
       final height = 4;
       // NV21: Y plane + UV interleaved
       final bytes = Uint8List((width * height * 1.5).toInt())..fillRange(0, width * height, 200);
       final result = RgbConverter.fromNv21(bytes, width, height);
-      expect(result.length, equals(224 * 224 * 3));
+      expect(result.length, equals(256 * 256 * 3));
     });
 
     test('values are normalised between 0 and 1', () {

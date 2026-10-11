@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'app_constants.dart';
+import '../constants/app_constants.dart';
 
 /// High-contrast theme (black/yellow/white) satisfying WCAG AA contrast ratios.
 class AppTheme {

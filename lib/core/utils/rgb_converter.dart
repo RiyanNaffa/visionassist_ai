@@ -2,14 +2,14 @@ import 'dart:typed_data';
 import 'dart:math' as math;
 
 /// Converts a raw YUV (NV21) or BGRA camera buffer to a flat Float32List
-/// representing a 224 × 224 RGB image normalised to 0–1.
+/// representing a 256 × 256 RGB image normalised to 0–1.
 ///
 /// Written in pure Dart so it is unit-testable without a device.
 class RgbConverter {
   RgbConverter._();
 
-  static const int _targetWidth = 224;
-  static const int _targetHeight = 224;
+  static const int _targetWidth = 256;
+  static const int _targetHeight = 256;
 
   /// Converts NV21 [bytes] (width × height × 1.5 bytes) to a normalised
   /// RGB Float32List.

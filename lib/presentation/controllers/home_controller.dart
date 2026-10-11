@@ -10,13 +10,14 @@ import '../../core/services/service_providers.dart';
 import '../../core/services/tts_service.dart';
 import '../../core/services/text_recognition_service.dart';
 import '../../core/services/speech_to_text_service.dart';
+import '../../core/utils/rgb_converter.dart';
 import '../../core/utils/stable_text_filter.dart';
+import '../../features/currency_detector/domain/usecases/detect_currency.dart';
 import '../../features/text_reader/data/text_reader_repository_impl.dart';
 import '../../features/text_reader/domain/usecases/recognize_text_from_file.dart';
-import '../../features/ingredient_analyzer/data/local_ingredient_repository.dart';
 import '../../features/ingredient_analyzer/domain/usecases/analyze_ingredients.dart';
-import '../../features/visual_qa/data/local_qa_repository.dart';
 import '../../features/visual_qa/domain/usecases/answer_visual_question.dart';
+import '../providers/repository_providers.dart';
 
 // ── State ──────────────────────────────────────────────────────────────────
 
@@ -84,6 +85,16 @@ class HomeController extends Notifier<HomeState> {
   late final AnalyzeIngredients _analyzeIngredients;
   late final AnswerVisualQuestion _answerQuestion;
   late final RecognizeTextFromFile _recognizeFromFile;
+  late final DetectCurrency _detectCurrency;
+
+  // ── Currency detection state ──────────────────────────────────────────────
+
+  /// The last set of denomination labels that was announced, used to avoid
+  /// re-announcing the same denominations on every frame.
+  Set<String> _lastSpokenLabels = {};
+
+  /// Whether the currency detector model was already announced as missing.
+  bool _missingModelAnnounced = false;
 
   @override
   HomeState build() {
@@ -95,11 +106,14 @@ class HomeController extends Notifier<HomeState> {
     _stt = ref.read(sttServiceProvider);
     _permissions = ref.read(permissionServiceProvider);
 
-    _analyzeIngredients = AnalyzeIngredients(LocalIngredientRepository());
-    _answerQuestion = AnswerVisualQuestion(LocalQaRepository());
+    _analyzeIngredients = AnalyzeIngredients(
+      ref.read(ingredientRepositoryProvider),
+    );
+    _answerQuestion = AnswerVisualQuestion(ref.read(qaRepositoryProvider));
     _recognizeFromFile = RecognizeTextFromFile(
       TextReaderRepositoryImpl(_recognition),
     );
+    _detectCurrency = DetectCurrency(ref.read(currencyDetectorProvider));
 
     // Check camera permission on init.
     _initCameraPermission();
@@ -172,7 +186,7 @@ class HomeController extends Notifier<HomeState> {
 
   Future<void> _processLiveFrame(CameraFrame frame) async {
     if (state.modeIndex == 0) {
-      // Text Reader
+      // ── Text Reader ───────────────────────────────────────────────────────
       final result = await _recognition.recognizeFromFrame(frame);
       if (result.isEmpty) return;
       final shouldSpeak = _stableFilter.feed(result.text);
@@ -182,8 +196,63 @@ class HomeController extends Notifier<HomeState> {
         await _audio.play(AudioCueEvent.beep);
         await _tts.speak(result.text, interrupt: false);
       }
+    } else if (state.modeIndex == 1) {
+      // ── Currency Detector ─────────────────────────────────────────────────
+      await _processCurrencyFrame(frame);
     }
-    // Currency Detector live processing is handled by mode handler.
+  }
+
+  /// Runs YOLO detection on [frame] and announces denominations when the
+  /// detected set changes compared to the last spoken frame.
+  Future<void> _processCurrencyFrame(CameraFrame frame) async {
+    // Announce once if the model file is missing.
+    if (!ref.read(currencyDetectorProvider).isAvailable) {
+      if (!_missingModelAnnounced) {
+        _missingModelAnnounced = true;
+        await _tts.speak(AppStrings.ttsCurrencyModelMissing, interrupt: true);
+      }
+      return;
+    }
+
+    // Convert raw camera frame to 256 × 256 normalised RGB.
+    final Float32List rgbInput;
+    if (frame.format == 'nv21' || frame.format == 'yuv420') {
+      rgbInput = RgbConverter.fromNv21(frame.bytes, frame.width, frame.height);
+    } else {
+      rgbInput = RgbConverter.fromBgra(frame.bytes, frame.width, frame.height);
+    }
+
+    final result = await _detectCurrency(rgbInput);
+
+    if (!result.hasDetections) {
+      // When frame is empty, reset so the next detection is always announced.
+      _lastSpokenLabels = {};
+      return;
+    }
+
+    final currentLabels = result.detectedLabels;
+
+    // Only announce when the set of denominations actually changes.
+    if (_setsEqual(currentLabels, _lastSpokenLabels)) return;
+    _lastSpokenLabels = Set.unmodifiable(currentLabels);
+
+    // Build spoken text: unique denominations, ascending order, joined by comma.
+    final sortedLabels =
+        currentLabels.toList()
+          ..sort((a, b) => (int.tryParse(a) ?? 0).compareTo(int.tryParse(b) ?? 0));
+
+    final speechParts =
+        sortedLabels
+            .map(AppStrings.currencySpeech)
+            .whereType<String>()
+            .toList();
+
+    if (speechParts.isEmpty) return;
+
+    final announcement = speechParts.join(', ');
+    state = state.copyWith(statusText: announcement);
+    await _audio.play(AudioCueEvent.beep);
+    await _tts.speak(announcement, interrupt: true);
   }
 
   // ── Mode switching ────────────────────────────────────────────────────────
@@ -202,6 +271,7 @@ class HomeController extends Notifier<HomeState> {
 
   Future<void> _switchMode(int index) async {
     _stableFilter.reset();
+    _lastSpokenLabels = {};
     state = state.copyWith(modeIndex: index, statusText: '');
     await _haptic.lightImpact();
     await _audio.play(AudioCueEvent.modeSwitch);
@@ -320,6 +390,11 @@ class HomeController extends Notifier<HomeState> {
       if (!_camera.isStreaming) _startLiveStream();
     }
   }
+
+  // ── Helpers ───────────────────────────────────────────────────────────────
+
+  bool _setsEqual(Set<String> a, Set<String> b) =>
+      a.length == b.length && a.containsAll(b);
 }
 
 // ── Provider ───────────────────────────────────────────────────────────────

@@ -99,8 +99,8 @@ class HomeController extends Notifier<HomeState> {
   /// re-announcing the same denominations on every frame.
   Set<String> _lastSpokenLabels = {};
 
-  /// Whether the currency detector model was already announced as missing.
-  bool _missingModelAnnounced = false;
+  /// Timestamp of the last "model missing" TTS so we don't spam it every frame.
+  DateTime? _lastMissingAnnouncedAt;
 
   @override
   HomeState build() {
@@ -213,16 +213,28 @@ class HomeController extends Notifier<HomeState> {
   /// Runs YOLO detection on [frame] and announces denominations when the
   /// detected set changes compared to the last spoken frame.
   Future<void> _processCurrencyFrame(CameraFrame frame) async {
-    // Model file absent — show warning on banner and speak once.
+    // Model still initialising (race condition guard) — wait silently.
+    // initialize() is async; isAvailable becomes true once it completes.
     if (!ref.read(currencyDetectorProvider).isAvailable) {
-      if (!_missingModelAnnounced) {
-        _missingModelAnnounced = true;
+      final now = DateTime.now();
+      final lastAnnounced = _lastMissingAnnouncedAt;
+      // Show banner immediately; repeat TTS at most once every 10 s.
+      if (state.statusText != AppStrings.bannerCurrencyModelMissing) {
         state = state.copyWith(
           statusText: AppStrings.bannerCurrencyModelMissing,
         );
+      }
+      if (lastAnnounced == null ||
+          now.difference(lastAnnounced).inSeconds >= 10) {
+        _lastMissingAnnouncedAt = now;
         await _tts.speak(AppStrings.ttsCurrencyModelMissing, interrupt: true);
       }
       return;
+    }
+
+    // Model became available — clear the missing banner if it was showing.
+    if (state.statusText == AppStrings.bannerCurrencyModelMissing) {
+      _lastMissingAnnouncedAt = null;
     }
 
     // Model loaded — show scanning hint while no banknote is visible.

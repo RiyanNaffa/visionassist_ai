@@ -43,8 +43,14 @@ class TfliteCurrencyDetector implements CurrencyDetector {
         'models/currency_detector.tflite',
       );
       _available = true;
+
+      // Log tensor shapes so we can verify the output contract.
+      final inShape = _interpreter!.getInputTensor(0).shape;
+      final outShape = _interpreter!.getOutputTensor(0).shape;
+      debugPrint('[CurrencyDetector] ✅ Model loaded. '
+          'Input: $inShape  Output: $outShape');
     } catch (e) {
-      debugPrint('[CurrencyDetector] Failed to load model: $e');
+      debugPrint('[CurrencyDetector] ❌ Failed to load model: $e');
       _available = false;
     }
   }
@@ -61,18 +67,39 @@ class TfliteCurrencyDetector implements CurrencyDetector {
     // Input tensor: [1, 256, 256, 3]
     final inputNested = _buildInputNested(input);
 
-    // Read expected output shape from interpreter so we allocate correctly.
+    // Read output shape dynamically to support both common YOLO export layouts:
+    //   A) [1, numDetections, 6]  — end-to-end (cx,cy,w,h,conf,cls)
+    //   B) [1, 84, numDetections] — Ultralytics default (transposed)
     final outputShape = _interpreter!.getOutputTensor(0).shape;
-    // outputShape = [1, numDetections, 6]
-    final numDetections = outputShape[1];
-    final outputBuffer = [
-      List.generate(numDetections, (_) => List<double>.filled(6, 0.0)),
-    ];
 
-    _interpreter!.runForMultipleInputs([inputNested], {0: outputBuffer});
+    List<_RawDetection> candidates;
+    try {
+      if (outputShape.length == 3 && outputShape[2] == 6) {
+        // Layout A: [1, N, 6]
+        final numDetections = outputShape[1];
+        final outputBuffer = [
+          List.generate(numDetections, (_) => List<double>.filled(6, 0.0)),
+        ];
+        _interpreter!.runForMultipleInputs([inputNested], {0: outputBuffer});
+        candidates = _filterByConfidence(outputBuffer[0]);
+      } else if (outputShape.length == 3 && outputShape[1] >= 5) {
+        // Layout B: [1, (4+numClasses), N] — Ultralytics transposed
+        final numAttrs = outputShape[1]; // e.g. 4+7=11 for 7 classes
+        final numDetections = outputShape[2];
+        final outputBuffer = [
+          List.generate(numAttrs, (_) => List<double>.filled(numDetections, 0.0)),
+        ];
+        _interpreter!.runForMultipleInputs([inputNested], {0: outputBuffer});
+        candidates = _filterByConfidenceTransposed(outputBuffer[0], numDetections);
+      } else {
+        debugPrint('[CurrencyDetector] ⚠ Unexpected output shape: $outputShape');
+        return const CurrencyDetectionResult(detections: []);
+      }
+    } catch (e) {
+      debugPrint('[CurrencyDetector] ❌ Inference error: $e');
+      return const CurrencyDetectionResult(detections: []);
+    }
 
-    final rawRows = outputBuffer[0];
-    final candidates = _filterByConfidence(rawRows);
     final afterNms = _nonMaxSuppression(candidates);
     final sorted = _sortByDenomination(afterNms);
 
@@ -102,7 +129,7 @@ class TfliteCurrencyDetector implements CurrencyDetector {
     );
   }
 
-  /// Discards rows whose confidence is below [_kConfThreshold].
+  /// Layout A: rows are `[cx, cy, w, h, confidence, class_id]`.
   List<_RawDetection> _filterByConfidence(List<List<double>> rows) {
     final result = <_RawDetection>[];
     for (final row in rows) {
@@ -117,6 +144,49 @@ class TfliteCurrencyDetector implements CurrencyDetector {
           h: row[3],
           confidence: conf,
           classIdx: classIdx,
+        ),
+      );
+    }
+    return result;
+  }
+
+  /// Layout B (Ultralytics transposed): tensor is `[1, 4+numClasses, N]`.
+  ///
+  /// Rows 0–3: cx, cy, w, h (normalised).
+  /// Rows 4..4+numClasses-1: per-class raw scores (no sigmoid — max = conf).
+  List<_RawDetection> _filterByConfidenceTransposed(
+    List<List<double>> tensor, // shape: [numAttrs][numDetections]
+    int numDetections,
+  ) {
+    final result = <_RawDetection>[];
+    final numClasses = _kClasses.length;
+
+    for (var i = 0; i < numDetections; i++) {
+      final cx = tensor[0][i];
+      final cy = tensor[1][i];
+      final w = tensor[2][i];
+      final h = tensor[3][i];
+
+      // Find the class with the highest score.
+      var maxScore = 0.0;
+      var maxCls = 0;
+      for (var c = 0; c < numClasses; c++) {
+        final score = tensor[4 + c][i];
+        if (score > maxScore) {
+          maxScore = score;
+          maxCls = c;
+        }
+      }
+
+      if (maxScore < _kConfThreshold) continue;
+      result.add(
+        _RawDetection(
+          cx: cx,
+          cy: cy,
+          w: w,
+          h: h,
+          confidence: maxScore,
+          classIdx: maxCls,
         ),
       );
     }

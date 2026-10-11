@@ -49,6 +49,3 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
-
-# Binary model file (large asset — track via Git LFS or document separately)
-assets/models/*.tflite

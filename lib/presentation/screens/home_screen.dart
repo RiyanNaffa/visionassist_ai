@@ -1,8 +1,11 @@
+import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/constants/app_constants.dart';
 import '../../core/constants/app_strings.dart';
+import '../../core/services/service_providers.dart';
+import '../../core/services/impl/flutter_camera_service.dart';
 import '../controllers/home_controller.dart';
 import '../widgets/mode_status_banner.dart';
 import '../widgets/quadrant_button.dart';
@@ -41,7 +44,45 @@ class HomeScreen extends ConsumerWidget {
   }
 }
 
-// ── Gesture layout ─────────────────────────────────────────────────────────
+// ── Camera preview widget ───────────────────────────────────────────────────
+
+/// Renders the live [CameraPreview] if the controller is ready, otherwise
+/// shows a loading indicator over a black background.
+///
+/// Watches [homeControllerProvider] for `cameraReady` so it rebuilds as soon
+/// as [HomeController._initCamera] finishes.
+class _LiveCameraPreview extends ConsumerWidget {
+  const _LiveCameraPreview();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    // Watch cameraReady so this widget rebuilds after camera initialises.
+    final cameraReady = ref.watch(
+      homeControllerProvider.select((s) => s.cameraReady),
+    );
+
+    if (!cameraReady) {
+      return Container(
+        color: AppColors.background,
+        child: const Center(
+          child: CircularProgressIndicator(color: AppColors.primary),
+        ),
+      );
+    }
+
+    final svc = ref.read(cameraServiceProvider);
+    final cameraController =
+        (svc is FlutterCameraService) ? svc.controller : null;
+
+    if (cameraController == null || !cameraController.value.isInitialized) {
+      return Container(color: AppColors.background);
+    }
+
+    return CameraPreview(cameraController);
+  }
+}
+
+// ── Gesture layout ──────────────────────────────────────────────────────────
 
 class _GestureLayout extends StatelessWidget {
   const _GestureLayout({
@@ -72,9 +113,9 @@ class _GestureLayout extends StatelessWidget {
         child: Stack(
           fit: StackFit.expand,
           children: [
-            // Camera preview placeholder (replace with CameraPreview widget).
-            Container(color: AppColors.background),
-            // Status overlay.
+            // Live camera preview.
+            const _LiveCameraPreview(),
+            // Status overlay pinned to bottom.
             Positioned(
               left: 0,
               right: 0,
@@ -88,7 +129,7 @@ class _GestureLayout extends StatelessWidget {
   }
 }
 
-// ── Accessible layout ─────────────────────────────────────────────────────
+// ── Accessible layout ───────────────────────────────────────────────────────
 
 class _AccessibleLayout extends StatelessWidget {
   const _AccessibleLayout({
@@ -103,9 +144,13 @@ class _AccessibleLayout extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        Expanded(
-          child: ModeStatusBanner(state: state),
+        // Camera preview takes upper half.
+        const Expanded(
+          child: _LiveCameraPreview(),
         ),
+        // Mode status banner.
+        ModeStatusBanner(state: state),
+        // Four quadrant buttons.
         Expanded(
           flex: 2,
           child: Padding(
@@ -148,7 +193,7 @@ class _AccessibleLayout extends StatelessWidget {
   }
 }
 
-// ── Permission denied screen ───────────────────────────────────────────────
+// ── Permission denied screen ────────────────────────────────────────────────
 
 class _PermissionDeniedScreen extends StatelessWidget {
   const _PermissionDeniedScreen({

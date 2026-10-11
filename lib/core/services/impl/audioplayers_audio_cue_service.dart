@@ -12,8 +12,11 @@ class AudioplayersAudioCueService implements AudioCueService {
   AudioplayersAudioCueService() {
     AudioPlayer.global.setAudioContext(
       AudioContext(
+        // `playback` + `mixWithOthers` lets audio cues play alongside TTS.
+        // `ambient` would be ideal but does NOT support mixWithOthers per the
+        // AVAudioSession contract — use `playback` which does.
         iOS: AudioContextIOS(
-          category: AVAudioSessionCategory.ambient,
+          category: AVAudioSessionCategory.playback,
           options: {AVAudioSessionOptions.mixWithOthers},
         ),
         android: AudioContextAndroid(

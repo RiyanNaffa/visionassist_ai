@@ -56,6 +56,13 @@ class AppStrings {
       'Model pendeteksi uang belum dipasang. '
       'Silakan ikuti petunjuk di README untuk menambahkan model.';
 
+  /// Short text shown on the status banner when the YOLO model file is absent.
+  static const String bannerCurrencyModelMissing =
+      '⚠ Model YOLO belum ada.\nLetakkan currency_detector.tflite di assets/models/';
+
+  /// Status banner text while scanning (model loaded, no banknote visible yet).
+  static const String bannerCurrencyScanning = 'Arahkan kamera ke uang kertas…';
+
   /// Maps a denomination class label (e.g. `'20000'`) to its Indonesian
   /// spoken form.  Returns `null` for unknown labels.
   static String? currencySpeech(String classLabel) =>

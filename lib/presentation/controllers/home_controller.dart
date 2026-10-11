@@ -30,6 +30,7 @@ class HomeState {
     this.cameraPermissionGranted = false,
     this.cameraPermissionPermanentlyDenied = false,
     this.isListeningForQuery = false,
+    this.cameraReady = false,
   });
 
   final int modeIndex;
@@ -38,6 +39,9 @@ class HomeState {
   final bool cameraPermissionGranted;
   final bool cameraPermissionPermanentlyDenied;
   final bool isListeningForQuery;
+
+  /// True once the [CameraController] is initialised and ready to preview.
+  final bool cameraReady;
 
   String get modeName => AppStrings.modeNames[modeIndex];
 
@@ -48,6 +52,7 @@ class HomeState {
     bool? cameraPermissionGranted,
     bool? cameraPermissionPermanentlyDenied,
     bool? isListeningForQuery,
+    bool? cameraReady,
   }) =>
       HomeState(
         modeIndex: modeIndex ?? this.modeIndex,
@@ -58,6 +63,7 @@ class HomeState {
         cameraPermissionPermanentlyDenied: cameraPermissionPermanentlyDenied ??
             this.cameraPermissionPermanentlyDenied,
         isListeningForQuery: isListeningForQuery ?? this.isListeningForQuery,
+        cameraReady: cameraReady ?? this.cameraReady,
       );
 }
 
@@ -162,6 +168,8 @@ class HomeController extends Notifier<HomeState> {
   Future<void> _initCamera() async {
     try {
       await _camera.initialize();
+      // Signal the UI to rebuild so CameraPreview can attach to the controller.
+      state = state.copyWith(cameraReady: true);
       _startLiveStream();
     } catch (e) {
       debugPrint('[HomeController] Camera init failed: $e');
@@ -205,13 +213,22 @@ class HomeController extends Notifier<HomeState> {
   /// Runs YOLO detection on [frame] and announces denominations when the
   /// detected set changes compared to the last spoken frame.
   Future<void> _processCurrencyFrame(CameraFrame frame) async {
-    // Announce once if the model file is missing.
+    // Model file absent — show warning on banner and speak once.
     if (!ref.read(currencyDetectorProvider).isAvailable) {
       if (!_missingModelAnnounced) {
         _missingModelAnnounced = true;
+        state = state.copyWith(
+          statusText: AppStrings.bannerCurrencyModelMissing,
+        );
         await _tts.speak(AppStrings.ttsCurrencyModelMissing, interrupt: true);
       }
       return;
+    }
+
+    // Model loaded — show scanning hint while no banknote is visible.
+    if (state.statusText.isEmpty ||
+        state.statusText == AppStrings.bannerCurrencyModelMissing) {
+      state = state.copyWith(statusText: AppStrings.bannerCurrencyScanning);
     }
 
     // Convert raw camera frame to 256 × 256 normalised RGB.
@@ -225,8 +242,12 @@ class HomeController extends Notifier<HomeState> {
     final result = await _detectCurrency(rgbInput);
 
     if (!result.hasDetections) {
-      // When frame is empty, reset so the next detection is always announced.
-      _lastSpokenLabels = {};
+      // Reset spoken-labels so next detection is always announced,
+      // and restore the scanning prompt.
+      if (_lastSpokenLabels.isNotEmpty) {
+        _lastSpokenLabels = {};
+        state = state.copyWith(statusText: AppStrings.bannerCurrencyScanning);
+      }
       return;
     }
 

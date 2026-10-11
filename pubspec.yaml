@@ -29,7 +29,8 @@ dependencies:
   permission_handler: ^11.3.1
 
   # TFLite
-  tflite_flutter: ^0.10.4
+  # >=0.11: 0.10.x fails to compile on Dart >=3.5 (UnmodifiableUint8ListView).
+  tflite_flutter: ^0.12.1
 
   # State management
   flutter_riverpod: ^2.6.1

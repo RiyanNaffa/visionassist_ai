@@ -13,6 +13,7 @@ analyzer:
     - '**/*.g.dart'
     - '**/*.freezed.dart'
     - build/**
+    - android/**
 
 linter:
   rules:

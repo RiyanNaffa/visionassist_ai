@@ -17,6 +17,10 @@ class FlutterCameraService implements CameraService {
   bool _busy = false;
   bool _streaming = false;
 
+  /// The underlying [CameraController] after [initialize] completes.
+  /// Null before initialisation. Used by the UI to render [CameraPreview].
+  CameraController? get controller => _controller;
+
   @override
   bool get isStreaming => _streaming;
 

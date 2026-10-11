@@ -1,3 +1,4 @@
+import 'package:camera/camera.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'camera_service.dart';
@@ -24,6 +25,13 @@ import '../../features/currency_detector/domain/repositories/currency_detector.d
 final cameraServiceProvider = Provider<CameraService>(
   (_) => FlutterCameraService(),
 );
+
+/// Exposes the raw [CameraController] for the [CameraPreview] widget.
+/// Returns null before the camera finishes initialising.
+final cameraControllerProvider = Provider<CameraController?>((ref) {
+  final svc = ref.watch(cameraServiceProvider);
+  return (svc is FlutterCameraService) ? svc.controller : null;
+});
 
 final textRecognitionServiceProvider = Provider<TextRecognitionService>(
   (_) => MlKitTextRecognitionService(),

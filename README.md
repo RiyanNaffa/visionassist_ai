@@ -1,8 +1,8 @@
 # VisionAssist AI
 
-[![Flutter](https://img.shields.io/badge/Flutter-3.22-02569B?logo=flutter)](https://flutter.dev)
+[![Flutter](https://img.shields.io/badge/Flutter-3.47-02569B?logo=flutter)](https://flutter.dev)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![CI](https://github.com/your-org/visionassist_ai/actions/workflows/ci.yml/badge.svg)](https://github.com/your-org/visionassist_ai/actions/workflows/ci.yml)
+[![CI](https://github.com/RiyanNaffa/visionassist_ai/actions/workflows/ci.yml/badge.svg)](https://github.com/RiyanNaffa/visionassist_ai/actions/workflows/ci.yml)
 
 ---
 
@@ -263,7 +263,7 @@ Any timeout, HTTP error or malformed response silently falls back to the local r
 
 ### Prerequisites
 
-- Flutter SDK ≥ 3.16 / Dart ≥ 3.0 (developed and built with Flutter 3.47, Dart 3.13; CI pins 3.22)
+- Flutter SDK ≥ 3.44 / Dart ≥ 3.12 (what `pubspec.lock` requires: `speech_to_text` 7.5, `camera` 0.11.4); developed with Flutter 3.47.7, and CI pins the same version
 - Android Studio with Android SDK (minSdk 26) and `platform-tools` (for `adb`), or Xcode 15+ for iOS
 - Python 3 (only for the platform patch script)
 - A phone with **Developer options → USB debugging** enabled (an emulator has no real camera/microphone)
@@ -272,7 +272,7 @@ Any timeout, HTTP error or malformed response silently falls back to the local r
 
 ```bash
 # 1. Clone
-git clone https://github.com/your-org/visionassist_ai.git
+git clone https://github.com/RiyanNaffa/visionassist_ai.git
 cd visionassist_ai
 
 # 2. Configure environment

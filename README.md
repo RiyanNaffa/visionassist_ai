@@ -128,16 +128,16 @@ LANGFLOW_FLOW_ID_INGREDIENT=<"id" in flows/ingredient_summary.json>
 
 ```bash
 docker compose up --build                 # first start takes a few minutes
-curl http://localhost:8000/v1/health      # → {"status":"ok","langflow":"reachable"}
+curl http://localhost:8001/v1/health      # → {"status":"ok","langflow":"reachable"}
 ```
 Langflow UI (to inspect the flows): http://localhost:7860.
 
 **2. Make the backend reachable from the phone**
 
 ```bash
-ngrok http 8000        # copy the https://<id>.ngrok-free.app URL
+ngrok http 8001        # copy the https://<id>.ngrok-free.app URL
 ```
-(Android emulator: skip this and use `http://10.0.2.2:8000` — see *Configuration*.)
+(Android emulator: skip this and use `http://10.0.2.2:8001` — see *Configuration*.)
 
 **3. App**
 
@@ -314,9 +314,9 @@ Choosing `API_PROXY_URL`:
 
 | Where the app runs | Value | Notes |
 |--------------------|-------|-------|
-| Android emulator | `http://10.0.2.2:8000` | needs cleartext (below) |
+| Android emulator | `http://10.0.2.2:8001` | needs cleartext (below) |
 | Real phone via tunnel | `https://<id>.ngrok-free.app` | easiest; HTTPS, no cleartext |
-| Real phone on the same Wi-Fi | `http://<pc-lan-ip>:8000` | needs cleartext **and** a firewall rule for port 8000 |
+| Real phone on the same Wi-Fi | `http://<pc-lan-ip>:8001` | needs cleartext **and** a firewall rule for port 8001 |
 
 `localhost` never works from a real phone. Android blocks plain `http://` by default — for the two `http://` cases add
 `android:usesCleartextTraffic="true"` to the `<application>` tag in `android/app/src/main/AndroidManifest.xml`

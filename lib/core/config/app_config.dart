@@ -5,7 +5,7 @@ class AppConfig {
   AppConfig._();
 
   /// Backend proxy base URL (never an LLM key), e.g. `https://abc.ngrok.app`
-  /// or `http://10.0.2.2:8000` for the Android emulator. No trailing `/v1`.
+  /// or `http://10.0.2.2:8001` for the Android emulator. No trailing `/v1`.
   /// Empty = remote features disabled.
   static const String apiProxyUrl = String.fromEnvironment(
     'API_PROXY_URL',

@@ -41,6 +41,7 @@ All interactions are spoken in **Bahasa Indonesia** with haptic feedback — des
 - **High-contrast theme**: black/yellow/white, WCAG AA contrast ratios.
 - **Portrait lock**: reduces accidental landscape confusion.
 - **Spoken mode announcements** on every switch.
+- **Spoken onboarding guide** on first launch (see *Onboarding guide*); swipe up, or the **Panduan** button with a screen reader, replays it.
 - **Haptic patterns** and **audio cues** (`beep`, `success`, `mode_switch`, `error` — `assets/audio/*.wav`) mixed with TTS.
 - **Never an error message**: when the network, backend or model is unavailable the app falls back to on-device logic and still speaks an answer.
 
@@ -54,6 +55,27 @@ All interactions are spoken in **Bahasa Indonesia** with haptic feedback — des
 | 2 | **Pendeteksi Uang** | Live | YOLO banknote **detector** (TFLite, 256×256, IDR 1.000–100.000) → announces every denomination in view; banner shows model/scan state |
 | 3 | **Analisis Bahan** | Capture | OCR → allergen + expiry + price extraction → ≤ 15-word spoken summary (optionally rephrased by the backend) |
 | 4 | **Tanya Gambar** | Capture | Voice question → OCR → backend answer (Gemini via Langflow) with on-device fallback; grounded in the text actually read |
+
+### Onboarding guide
+
+On first launch the app talks the user through how it works, one step at a time, before it asks for the camera:
+welcome → how to hold the phone → the four modes → each mode → the remaining gestures → start.
+
+| In the guide | Gesture | Screen-reader button |
+|--------------|---------|----------------------|
+| Next step (finishes on the last step) | Swipe left | **Berikutnya** / **Mulai** |
+| Previous step | Swipe right | **Sebelumnya** |
+| Repeat the step | Single tap | — (the step text is on screen) |
+| Skip the guide | Double tap | **Lewati Panduan** |
+
+- Each step is also shown in large text with "Langkah n dari 9", for low-vision users.
+- Live camera processing is paused while the guide runs, so it never talks over it.
+- The camera permission is requested only after the guide, with a spoken explanation first.
+- Finishing or skipping is remembered on the device (`shared_preferences`, behind `OnboardingStore`). Later launches get
+  a short greeting instead: *"Selamat datang kembali di VisionAssist AI. Mode Pembaca Teks aktif. Geser ke atas untuk
+  mendengar panduan."*
+- With TalkBack / VoiceOver the guide describes the buttons instead of the gestures. Both variants live in
+  `AppStrings.onboardingSteps` and must keep the same number of steps.
 
 ### Currency detector (mode 2)
 
@@ -163,6 +185,7 @@ flutter run --dart-define-from-file=.env -d <device-id>
 
 | Mode | What to do |
 |------|------------|
+| First launch | Listen to the spoken guide: swipe left for the next step, double-tap to skip; then allow the camera |
 | Pembaca Teks | Point the camera at printed text; it is read aloud once stable |
 | Pendeteksi Uang | Swipe to the mode and show a Rupiah note (needs `assets/models/currency_detector.tflite`) |
 | Analisis Bahan | Double-tap to photograph a food label → allergens, expiry, price |
@@ -254,6 +277,7 @@ Any timeout, HTTP error or malformed response silently falls back to the local r
 | Double tap | Capture photo | **Ambil Foto** button |
 | Long press | Start voice question | **Tanya dengan Suara** button |
 | Single tap | Pause / resume TTS | — |
+| Swipe up | Replay the spoken guide | **Panduan** button |
 
 A swipe must travel at least 80 dp from where the finger landed and end faster than 200 dp/s (`SwipeDetector`), so a
 thumb brushing the screen while holding the phone does not switch modes or skip a step of the guide.
@@ -401,7 +425,8 @@ flutter test --coverage
 | Backend HTTP client | `test/unit/proxy_client_test.dart` |
 | Remote Q&A + fallback | `test/unit/remote_qa_repository_test.dart` |
 | Remote ingredient summary + client guard | `test/unit/remote_ingredient_repository_test.dart` |
-| HomeScreen widgets | `test/widget/home_screen_test.dart` |
+| Onboarding guide: steps, skip, camera request, paused live stream | `test/unit/onboarding_flow_test.dart` |
+| HomeScreen widgets, onboarding screen, small-screen / large-font layout | `test/widget/home_screen_test.dart` |
 | TTS sentence queue: order, interrupt, pause/resume, no stray cut-offs | `test/unit/flutter_tts_service_test.dart` |
 | Swipe thresholds: brushes and slow drags ignored | `test/widget/swipe_detector_test.dart` |
 

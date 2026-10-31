@@ -17,6 +17,8 @@ import '../widgets/swipe_detector.dart';
 /// - **Screen-reader mode** (`accessibleNavigation == true`): four large
 ///   quadrant buttons for Previous mode, Next mode, Capture, and Ask by voice.
 /// - **Standard gesture mode**: swipe left/right, double-tap, long-press.
+///
+/// While the spoken guide runs, [_OnboardingScreen] replaces both layouts.
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
 
@@ -25,6 +27,14 @@ class HomeScreen extends ConsumerWidget {
     final state = ref.watch(homeControllerProvider);
     final controller = ref.read(homeControllerProvider.notifier);
     final accessible = MediaQuery.of(context).accessibleNavigation;
+
+    if (state.isOnboarding) {
+      return _OnboardingScreen(
+        state: state,
+        controller: controller,
+        accessible: accessible,
+      );
+    }
 
     if (!state.cameraPermissionGranted) {
       return _PermissionDeniedScreen(
@@ -101,6 +111,8 @@ class _GestureLayout extends StatelessWidget {
       child: SwipeDetector(
         onSwipeLeft: controller.nextMode,
         onSwipeRight: controller.previousMode,
+        // Swipe up replays the spoken guide.
+        onSwipeUp: controller.startOnboarding,
         onTap: controller.onSingleTap,
         onDoubleTap: controller.onDoubleTap,
         onLongPress: controller.onLongPress,
@@ -182,6 +194,151 @@ class _AccessibleLayout extends StatelessWidget {
             ),
           ),
         ),
+        // Replays the spoken guide (swipe up in gesture mode).
+        Padding(
+          padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+          child: SizedBox(
+            width: double.infinity,
+            child: QuadrantButton(
+              label: AppStrings.btnGuide,
+              semanticsHint: AppStrings.hintSwipeUp,
+              onPressed: controller.startOnboarding,
+              icon: Icons.help_outline,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ── Onboarding (spoken guide) ───────────────────────────────────────────────
+
+/// Shows the step being spoken in large text, for low-vision users.
+///
+/// Gesture mode mirrors the main screen: swipe left = next, swipe right =
+/// back, tap = repeat, double tap = skip (or start, on the last step).
+/// With a screen reader the same actions are buttons.
+class _OnboardingScreen extends StatelessWidget {
+  const _OnboardingScreen({
+    required this.state,
+    required this.controller,
+    required this.accessible,
+  });
+
+  final HomeState state;
+  final HomeController controller;
+  final bool accessible;
+
+  @override
+  Widget build(BuildContext context) {
+    final steps = AppStrings.onboardingSteps(screenReader: accessible);
+    final step = state.onboardingStep.clamp(0, steps.length - 1);
+    final isLast = step == steps.length - 1;
+
+    final content = Padding(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            AppStrings.onboardingProgress(step + 1, steps.length),
+            style: const TextStyle(color: AppColors.muted, fontSize: 16),
+          ),
+          const SizedBox(height: 16),
+          Expanded(
+            child: SingleChildScrollView(
+              child: Text(
+                steps[step],
+                style: const TextStyle(
+                  color: AppColors.onBackground,
+                  fontSize: 24,
+                  height: 1.4,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          if (accessible)
+            _OnboardingButtons(controller: controller, isLast: isLast)
+          else
+            const Text(
+              AppStrings.onboardingGestureHint,
+              style: TextStyle(color: AppColors.primary, fontSize: 16),
+              textAlign: TextAlign.center,
+            ),
+        ],
+      ),
+    );
+
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      body: SafeArea(
+        child: accessible
+            ? content
+            : SwipeDetector(
+                onSwipeLeft: controller.onboardingNext,
+                onSwipeRight: controller.onboardingPrevious,
+                onTap: controller.onboardingRepeat,
+                onDoubleTap: controller.finishOnboarding,
+                child: content,
+              ),
+      ),
+    );
+  }
+}
+
+/// Screen-reader controls for the guide: back, next / start, and skip.
+class _OnboardingButtons extends StatelessWidget {
+  const _OnboardingButtons({required this.controller, required this.isLast});
+
+  final HomeController controller;
+  final bool isLast;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // Equal-height buttons that grow with their labels, so large system
+        // font sizes wrap instead of overflowing.
+        IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(
+                child: QuadrantButton(
+                  label: AppStrings.btnOnboardingPrevious,
+                  semanticsHint: AppStrings.hintOnboardingPrevious,
+                  onPressed: controller.onboardingPrevious,
+                  icon: Icons.arrow_back,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: QuadrantButton(
+                  label: isLast
+                      ? AppStrings.btnOnboardingStart
+                      : AppStrings.btnOnboardingNext,
+                  semanticsHint: isLast
+                      ? AppStrings.hintOnboardingStart
+                      : AppStrings.hintOnboardingNext,
+                  onPressed: controller.onboardingNext,
+                  icon: isLast ? Icons.check : Icons.arrow_forward,
+                ),
+              ),
+            ],
+          ),
+        ),
+        if (!isLast) ...[
+          const SizedBox(height: 8),
+          QuadrantButton(
+            label: AppStrings.btnOnboardingSkip,
+            semanticsHint: AppStrings.hintOnboardingSkip,
+            onPressed: controller.finishOnboarding,
+            icon: Icons.skip_next,
+          ),
+        ],
       ],
     );
   }
@@ -205,62 +362,65 @@ class _PermissionDeniedScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Semantics(
-                label: AppStrings.permissionCameraTitle,
-                child: const Text(
-                  AppStrings.permissionCameraTitle,
-                  style: TextStyle(
-                    color: AppColors.primary,
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              ),
-              const SizedBox(height: 16),
-              Semantics(
-                label: AppStrings.permissionCameraMessage,
-                child: const Text(
-                  AppStrings.permissionCameraMessage,
-                  style: TextStyle(
-                    color: AppColors.onBackground,
-                    fontSize: 16,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              ),
-              const SizedBox(height: 32),
-              if (isPermanent)
+        child: Center(
+          // Scrolls instead of overflowing at large system font sizes.
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
                 Semantics(
-                  button: true,
-                  label: AppStrings.permissionCameraSettings,
-                  child: ElevatedButton(
-                    onPressed: onSettings,
-                    style: ElevatedButton.styleFrom(
-                      minimumSize: const Size.fromHeight(72),
+                  label: AppStrings.permissionCameraTitle,
+                  child: const Text(
+                    AppStrings.permissionCameraTitle,
+                    style: TextStyle(
+                      color: AppColors.primary,
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
                     ),
-                    child: const Text(AppStrings.permissionCameraSettings),
-                  ),
-                )
-              else
-                Semantics(
-                  button: true,
-                  label: AppStrings.permissionCameraRetry,
-                  child: ElevatedButton(
-                    onPressed: onRetry,
-                    style: ElevatedButton.styleFrom(
-                      minimumSize: const Size.fromHeight(72),
-                    ),
-                    child: const Text(AppStrings.permissionCameraRetry),
+                    textAlign: TextAlign.center,
                   ),
                 ),
-            ],
+                const SizedBox(height: 16),
+                Semantics(
+                  label: AppStrings.permissionCameraMessage,
+                  child: const Text(
+                    AppStrings.permissionCameraMessage,
+                    style: TextStyle(
+                      color: AppColors.onBackground,
+                      fontSize: 16,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+                const SizedBox(height: 32),
+                if (isPermanent)
+                  Semantics(
+                    button: true,
+                    label: AppStrings.permissionCameraSettings,
+                    child: ElevatedButton(
+                      onPressed: onSettings,
+                      style: ElevatedButton.styleFrom(
+                        minimumSize: const Size.fromHeight(72),
+                      ),
+                      child: const Text(AppStrings.permissionCameraSettings),
+                    ),
+                  )
+                else
+                  Semantics(
+                    button: true,
+                    label: AppStrings.permissionCameraRetry,
+                    child: ElevatedButton(
+                      onPressed: onRetry,
+                      style: ElevatedButton.styleFrom(
+                        minimumSize: const Size.fromHeight(72),
+                      ),
+                      child: const Text(AppStrings.permissionCameraRetry),
+                    ),
+                  ),
+              ],
+            ),
           ),
         ),
       ),

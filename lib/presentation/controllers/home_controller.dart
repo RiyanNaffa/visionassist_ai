@@ -1,11 +1,13 @@
 import 'package:camera/camera.dart' show CameraController;
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart' show WidgetsBinding;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/constants/app_strings.dart';
 import '../../core/services/audio_cue_service.dart';
 import '../../core/services/camera_service.dart';
 import '../../core/services/haptic_service.dart';
+import '../../core/services/onboarding_store.dart';
 import '../../core/services/permission_service.dart';
 import '../../core/services/service_providers.dart';
 import '../../core/services/speech_to_text_service.dart';
@@ -32,6 +34,8 @@ class HomeState {
     this.cameraPermissionPermanentlyDenied = false,
     this.isListeningForQuery = false,
     this.cameraReady = false,
+    this.isOnboarding = false,
+    this.onboardingStep = 0,
   });
 
   final int modeIndex;
@@ -44,6 +48,12 @@ class HomeState {
   /// True once the [CameraController] is initialised and ready to preview.
   final bool cameraReady;
 
+  /// True while the spoken guide is running; live processing is paused.
+  final bool isOnboarding;
+
+  /// Zero-based index into [AppStrings.onboardingSteps].
+  final int onboardingStep;
+
   String get modeName => AppStrings.modeNames[modeIndex];
 
   HomeState copyWith({
@@ -54,6 +64,8 @@ class HomeState {
     bool? cameraPermissionPermanentlyDenied,
     bool? isListeningForQuery,
     bool? cameraReady,
+    bool? isOnboarding,
+    int? onboardingStep,
   }) =>
       HomeState(
         modeIndex: modeIndex ?? this.modeIndex,
@@ -65,6 +77,8 @@ class HomeState {
             this.cameraPermissionPermanentlyDenied,
         isListeningForQuery: isListeningForQuery ?? this.isListeningForQuery,
         cameraReady: cameraReady ?? this.cameraReady,
+        isOnboarding: isOnboarding ?? this.isOnboarding,
+        onboardingStep: onboardingStep ?? this.onboardingStep,
       );
 }
 
@@ -83,6 +97,7 @@ class HomeController extends Notifier<HomeState> {
   late final TextRecognitionService _recognition;
   late final SpeechToTextService _stt;
   late final PermissionService _permissions;
+  late final OnboardingStore _onboarding;
 
   // Utilities
   final StableTextFilter _stableFilter = StableTextFilter();
@@ -117,6 +132,7 @@ class HomeController extends Notifier<HomeState> {
     _recognition = ref.read(textRecognitionServiceProvider);
     _stt = ref.read(sttServiceProvider);
     _permissions = ref.read(permissionServiceProvider);
+    _onboarding = ref.read(onboardingStoreProvider);
 
     _analyzeIngredients = AnalyzeIngredients(
       ref.read(ingredientRepositoryProvider),
@@ -127,11 +143,37 @@ class HomeController extends Notifier<HomeState> {
     );
     _detectCurrency = DetectCurrency(ref.read(currencyDetectorProvider));
 
-    // Check camera permission on init.
-    _initCameraPermission();
+    _start();
 
     return const HomeState();
   }
+
+  /// First launch: the spoken guide, which asks for the camera when it ends.
+  /// Later launches: a short greeting, then the camera.
+  Future<void> _start() async {
+    if (!await _onboarding.isCompleted()) {
+      await startOnboarding();
+      return;
+    }
+    final hint = _screenReader
+        ? AppStrings.ttsGuideHintButton
+        : AppStrings.ttsGuideHintGesture;
+    // Not awaited before the camera: speak() may not return until the TTS
+    // engine has bound, which takes seconds on a cold start. No interrupt,
+    // so the greeting is queued at once, ahead of any camera prompt from
+    // _initCameraPermission().
+    final greeting = _tts.speak(
+      '${AppStrings.ttsWelcomeBack} '
+      '${AppStrings.ttsActiveMode(state.modeName)} $hint',
+    );
+    await _initCameraPermission();
+    await greeting;
+  }
+
+  /// Whether TalkBack / VoiceOver is on — the same flag that makes
+  /// HomeScreen show buttons instead of gestures.
+  bool get _screenReader => WidgetsBinding
+      .instance.platformDispatcher.accessibilityFeatures.accessibleNavigation;
 
   // ── Permission ────────────────────────────────────────────────────────────
 
@@ -141,6 +183,8 @@ class HomeController extends Notifier<HomeState> {
       state = state.copyWith(cameraPermissionGranted: true);
       await _initCamera();
     } else {
+      // Queued after any greeting, so the user hears why a dialog appears.
+      await _tts.speak(AppStrings.ttsCameraPermissionPrompt);
       await requestCameraPermission();
     }
   }
@@ -186,6 +230,8 @@ class HomeController extends Notifier<HomeState> {
 
   void _startLiveStream() {
     _camera.startImageStream((frame) async {
+      // Stay quiet while the spoken guide is running.
+      if (state.isOnboarding) return;
       // Only Text Reader (0) and Currency Detector (1) use live stream.
       if (state.modeIndex > 1) return;
       if (_liveProcessingBusy) return;
@@ -317,6 +363,66 @@ class HomeController extends Notifier<HomeState> {
       interrupt: true,
     );
   }
+
+  // ── Onboarding (spoken guide) ─────────────────────────────────────────────
+
+  List<String> get _onboardingSteps =>
+      AppStrings.onboardingSteps(screenReader: _screenReader);
+
+  /// Starts the spoken guide from its first step: automatically on first
+  /// launch, and again whenever the user swipes up / picks "Panduan".
+  Future<void> startOnboarding() async {
+    if (state.isProcessing || state.isListeningForQuery) return;
+    state = state.copyWith(isOnboarding: true, onboardingStep: 0);
+    await _haptic.lightImpact();
+    await _speakOnboardingStep();
+  }
+
+  /// Next step; on the last step this finishes the guide.
+  Future<void> onboardingNext() async {
+    if (!state.isOnboarding) return;
+    final next = state.onboardingStep + 1;
+    if (next >= _onboardingSteps.length) return finishOnboarding();
+    state = state.copyWith(onboardingStep: next);
+    await _haptic.selectionClick();
+    await _speakOnboardingStep();
+  }
+
+  /// Previous step; on the first step this repeats it.
+  Future<void> onboardingPrevious() async {
+    if (!state.isOnboarding) return;
+    final previous = state.onboardingStep > 0 ? state.onboardingStep - 1 : 0;
+    state = state.copyWith(onboardingStep: previous);
+    await _haptic.selectionClick();
+    await _speakOnboardingStep();
+  }
+
+  /// Speaks the current step again.
+  Future<void> onboardingRepeat() async {
+    if (!state.isOnboarding) return;
+    await _speakOnboardingStep();
+  }
+
+  /// Ends the guide — after the last step, or skipped from any other — and
+  /// remembers it, so later launches only get a short greeting.
+  Future<void> finishOnboarding() async {
+    if (!state.isOnboarding) return;
+    final skipped = state.onboardingStep < _onboardingSteps.length - 1;
+    state = state.copyWith(isOnboarding: false, onboardingStep: 0);
+    await _onboarding.markCompleted();
+    await _haptic.success();
+    await _audio.play(AudioCueEvent.success);
+    await _tts.speak(
+      '${skipped ? AppStrings.ttsOnboardingSkipped : AppStrings.ttsOnboardingDone} '
+      '${AppStrings.ttsActiveMode(state.modeName)}',
+      interrupt: true,
+    );
+    // First launch: the camera was not requested yet.
+    if (!state.cameraPermissionGranted) await _initCameraPermission();
+  }
+
+  Future<void> _speakOnboardingStep() =>
+      _tts.speak(_onboardingSteps[state.onboardingStep], interrupt: true);
 
   // ── Single tap: pause / resume ────────────────────────────────────────────
 

@@ -12,7 +12,9 @@ import 'impl/flutter_haptic_service.dart';
 import 'impl/flutter_tts_service.dart';
 import 'impl/mlkit_text_recognition_service.dart';
 import 'impl/ph_permission_service.dart';
+import 'impl/shared_prefs_onboarding_store.dart';
 import 'impl/stt_speech_to_text_service.dart';
+import 'onboarding_store.dart';
 import 'permission_service.dart';
 import 'speech_to_text_service.dart';
 import 'text_recognition_service.dart';
@@ -58,6 +60,10 @@ final sttServiceProvider = Provider<SpeechToTextService>(
 
 final permissionServiceProvider = Provider<PermissionService>(
   (_) => PhPermissionService(),
+);
+
+final onboardingStoreProvider = Provider<OnboardingStore>(
+  (_) => SharedPrefsOnboardingStore(),
 );
 
 /// The YOLO banknote detector.

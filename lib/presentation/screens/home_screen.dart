@@ -9,6 +9,7 @@ import '../../core/services/service_providers.dart';
 import '../controllers/home_controller.dart';
 import '../widgets/mode_status_banner.dart';
 import '../widgets/quadrant_button.dart';
+import '../widgets/swipe_detector.dart';
 
 /// The main application screen.
 ///
@@ -97,16 +98,9 @@ class _GestureLayout extends StatelessWidget {
   Widget build(BuildContext context) {
     return Semantics(
       label: AppStrings.semanticsCamera,
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onHorizontalDragEnd: (details) {
-          final dx = details.primaryVelocity ?? 0;
-          if (dx < -200) {
-            controller.nextMode();
-          } else if (dx > 200) {
-            controller.previousMode();
-          }
-        },
+      child: SwipeDetector(
+        onSwipeLeft: controller.nextMode,
+        onSwipeRight: controller.previousMode,
         onTap: controller.onSingleTap,
         onDoubleTap: controller.onDoubleTap,
         onLongPress: controller.onLongPress,

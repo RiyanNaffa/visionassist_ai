@@ -255,6 +255,9 @@ Any timeout, HTTP error or malformed response silently falls back to the local r
 | Long press | Start voice question | **Tanya dengan Suara** button |
 | Single tap | Pause / resume TTS | — |
 
+A swipe must travel at least 80 dp from where the finger landed and end faster than 200 dp/s (`SwipeDetector`), so a
+thumb brushing the screen while holding the phone does not switch modes or skip a step of the guide.
+
 > When `MediaQuery.accessibleNavigation == true`, raw gestures are disabled and the four quadrant buttons are shown.
 
 ---
@@ -400,6 +403,7 @@ flutter test --coverage
 | Remote ingredient summary + client guard | `test/unit/remote_ingredient_repository_test.dart` |
 | HomeScreen widgets | `test/widget/home_screen_test.dart` |
 | TTS sentence queue: order, interrupt, pause/resume, no stray cut-offs | `test/unit/flutter_tts_service_test.dart` |
+| Swipe thresholds: brushes and slow drags ignored | `test/widget/swipe_detector_test.dart` |
 
 ---
 

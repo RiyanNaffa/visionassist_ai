@@ -399,6 +399,7 @@ flutter test --coverage
 | Remote Q&A + fallback | `test/unit/remote_qa_repository_test.dart` |
 | Remote ingredient summary + client guard | `test/unit/remote_ingredient_repository_test.dart` |
 | HomeScreen widgets | `test/widget/home_screen_test.dart` |
+| TTS sentence queue: order, interrupt, pause/resume, no stray cut-offs | `test/unit/flutter_tts_service_test.dart` |
 
 ---
 

@@ -1,3 +1,5 @@
+import 'dart:isolate';
+
 import 'package:camera/camera.dart' show CameraController;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart' show WidgetsBinding;
@@ -295,15 +297,13 @@ class HomeController extends Notifier<HomeState> {
       state = state.copyWith(statusText: AppStrings.bannerCurrencyScanning);
     }
 
-    // Convert raw camera frame to 256 × 256 normalised RGB.
-    final Float32List rgbInput;
-    if (frame.format == 'nv21' || frame.format == 'yuv420') {
-      rgbInput = RgbConverter.fromNv21(frame.bytes, frame.width, frame.height);
-    } else {
-      rgbInput = RgbConverter.fromBgra(frame.bytes, frame.width, frame.height);
-    }
+    final rgbInput = await _rgbInBackground(frame);
+    if (!_stillDetectingCurrency) return;
 
     final result = await _detectCurrency(rgbInput);
+    // The user may have switched modes while the frame was processed; a late
+    // announcement would talk over "Mode diubah ke ...".
+    if (!_stillDetectingCurrency) return;
 
     if (!result.hasDetections) {
       // Reset spoken-labels so next detection is always announced,
@@ -337,6 +337,9 @@ class HomeController extends Notifier<HomeState> {
     await _audio.play(AudioCueEvent.beep);
     await _tts.speak(announcement, interrupt: true);
   }
+
+  bool get _stillDetectingCurrency =>
+      state.modeIndex == 1 && !state.isOnboarding;
 
   // ── Mode switching ────────────────────────────────────────────────────────
 
@@ -565,6 +568,21 @@ class HomeController extends Notifier<HomeState> {
 
   bool _setsEqual(Set<String> a, Set<String> b) =>
       a.length == b.length && a.containsAll(b);
+}
+
+/// Converts [frame] to the currency detector's 256 × 256 RGB input on a
+/// background isolate: converting a whole camera frame in Dart on the UI
+/// isolate took long enough to swallow swipes.
+Future<Float32List> _rgbInBackground(CameraFrame frame) {
+  final bytes = frame.bytes;
+  final width = frame.width;
+  final height = frame.height;
+  final nv21 = frame.format == 'nv21' || frame.format == 'yuv420';
+  return Isolate.run(
+    () => nv21
+        ? RgbConverter.fromNv21(bytes, width, height)
+        : RgbConverter.fromBgra(bytes, width, height),
+  );
 }
 
 // ── Provider ───────────────────────────────────────────────────────────────

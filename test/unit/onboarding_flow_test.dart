@@ -1,217 +1,11 @@
 import 'dart:async';
 import 'dart:typed_data';
 
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:visionassist_ai/core/constants/app_strings.dart';
-import 'package:visionassist_ai/core/services/audio_cue_service.dart';
 import 'package:visionassist_ai/core/services/camera_service.dart';
-import 'package:visionassist_ai/core/services/haptic_service.dart';
-import 'package:visionassist_ai/core/services/onboarding_store.dart';
-import 'package:visionassist_ai/core/services/permission_service.dart';
-import 'package:visionassist_ai/core/services/service_providers.dart';
-import 'package:visionassist_ai/core/services/speech_to_text_service.dart';
-import 'package:visionassist_ai/core/services/text_recognition_service.dart';
-import 'package:visionassist_ai/core/services/tts_service.dart';
-import 'package:visionassist_ai/features/currency_detector/domain/entities/currency_detection.dart';
-import 'package:visionassist_ai/features/currency_detector/domain/repositories/currency_detector.dart';
-import 'package:visionassist_ai/presentation/controllers/home_controller.dart';
 
-// ── Fakes ──────────────────────────────────────────────────────────────────
-
-class _RecordingTts implements TtsService {
-  final List<String> spoken = [];
-
-  /// speak() returns only once this completes, like a TTS engine that is
-  /// still binding on a cold start.
-  Future<void> engineReady = Future.value();
-
-  @override
-  bool get isSpeaking => false;
-  @override
-  bool get isPaused => false;
-  @override
-  Future<void> speak(String t, {bool interrupt = false}) async {
-    spoken.add(t);
-    await engineReady;
-  }
-
-  @override
-  Future<void> pause() async {}
-  @override
-  Future<void> resume() async {}
-  @override
-  Future<void> stop() async {}
-  @override
-  Future<void> setSpeechRate(double r) async {}
-  @override
-  Future<void> setPitch(double p) async {}
-  @override
-  Future<void> dispose() async {}
-}
-
-class _FakeStore implements OnboardingStore {
-  _FakeStore({required this.completed});
-  bool completed;
-  int marks = 0;
-  @override
-  Future<bool> isCompleted() async => completed;
-  @override
-  Future<void> markCompleted() async {
-    marks++;
-    completed = true;
-  }
-}
-
-class _FakePermissions implements PermissionService {
-  _FakePermissions({required this.granted});
-  final bool granted;
-  int checks = 0;
-  int requests = 0;
-  PermissionStatus get _status =>
-      granted ? PermissionStatus.granted : PermissionStatus.denied;
-  @override
-  Future<PermissionStatus> check(AppPermission p) async {
-    checks++;
-    return _status;
-  }
-
-  @override
-  Future<PermissionStatus> request(AppPermission p) async {
-    requests++;
-    return _status;
-  }
-
-  @override
-  Future<void> openSettings() async {}
-}
-
-class _FakeCamera implements CameraService {
-  bool initialized = false;
-  void Function(CameraFrame f)? onFrame;
-  @override
-  bool get isStreaming => onFrame != null;
-  @override
-  Future<void> initialize() async => initialized = true;
-  @override
-  void startImageStream(void Function(CameraFrame f) cb) => onFrame = cb;
-  @override
-  Future<void> stopImageStream() async => onFrame = null;
-  @override
-  Future<String> takePicture() async => '/tmp/test.jpg';
-  @override
-  Future<void> dispose() async {}
-}
-
-class _CountingRecognition implements TextRecognitionService {
-  int frames = 0;
-  @override
-  Future<TextRecognitionResult> recognizeFromFrame(CameraFrame f) async {
-    frames++;
-    return const TextRecognitionResult(text: '', blocks: []);
-  }
-
-  @override
-  Future<TextRecognitionResult> recognizeFromFile(String p) async =>
-      const TextRecognitionResult(text: '', blocks: []);
-  @override
-  Future<void> dispose() async {}
-}
-
-class _FakeHaptic implements HapticService {
-  @override
-  Future<void> selectionClick() async {}
-  @override
-  Future<void> lightImpact() async {}
-  @override
-  Future<void> mediumImpact() async {}
-  @override
-  Future<void> heavyImpact() async {}
-  @override
-  Future<void> denominationPattern(String d) async {}
-  @override
-  Future<void> success() async {}
-  @override
-  Future<void> error() async {}
-}
-
-class _FakeAudio implements AudioCueService {
-  @override
-  Future<void> play(AudioCueEvent e) async {}
-  @override
-  Future<void> dispose() async {}
-}
-
-class _FakeStt implements SpeechToTextService {
-  @override
-  bool get isListening => false;
-  @override
-  Future<bool> initialize() async => true;
-  @override
-  Future<void> startListening({
-    required void Function(SpeechResult r) onResult,
-    String localeId = 'id-ID',
-    Duration listenFor = const Duration(seconds: 10),
-  }) async {}
-  @override
-  Future<void> stopListening() async {}
-  @override
-  Future<void> dispose() async {}
-}
-
-class _FakeCurrencyDetector implements CurrencyDetector {
-  @override
-  bool get isAvailable => false;
-  @override
-  Future<CurrencyDetectionResult> detect(Float32List input) async =>
-      const CurrencyDetectionResult(detections: []);
-}
-
-// ── Harness ────────────────────────────────────────────────────────────────
-
-class _Harness {
-  _Harness({required bool completed, required bool granted})
-      : store = _FakeStore(completed: completed),
-        permissions = _FakePermissions(granted: granted) {
-    container = ProviderContainer(
-      overrides: [
-        ttsServiceProvider.overrideWithValue(tts),
-        onboardingStoreProvider.overrideWithValue(store),
-        permissionServiceProvider.overrideWithValue(permissions),
-        cameraServiceProvider.overrideWithValue(camera),
-        textRecognitionServiceProvider.overrideWithValue(recognition),
-        hapticServiceProvider.overrideWithValue(_FakeHaptic()),
-        audioCueServiceProvider.overrideWithValue(_FakeAudio()),
-        sttServiceProvider.overrideWithValue(_FakeStt()),
-        currencyDetectorProvider.overrideWithValue(_FakeCurrencyDetector()),
-      ],
-    );
-    addTearDown(container.dispose);
-  }
-
-  final tts = _RecordingTts();
-  final _FakeStore store;
-  final _FakePermissions permissions;
-  final camera = _FakeCamera();
-  final recognition = _CountingRecognition();
-  late final ProviderContainer container;
-
-  HomeController get controller =>
-      container.read(homeControllerProvider.notifier);
-  HomeState get state => container.read(homeControllerProvider);
-
-  /// Builds the controller and lets its async start-up run.
-  Future<void> start() async {
-    container.read(homeControllerProvider);
-    await settle();
-  }
-}
-
-Future<void> settle() async {
-  for (var i = 0; i < 20; i++) {
-    await Future<void>.delayed(Duration.zero);
-  }
-}
+import '../helpers/home_controller_harness.dart';
 
 final _steps = AppStrings.onboardingSteps(screenReader: false);
 
@@ -238,7 +32,7 @@ void main() {
 
   group('first launch', () {
     test('starts the guide and holds back the camera request', () async {
-      final h = _Harness(completed: false, granted: false);
+      final h = HomeControllerHarness(completed: false, granted: false);
       await h.start();
 
       expect(h.state.isOnboarding, isTrue);
@@ -249,7 +43,7 @@ void main() {
     });
 
     test('next, previous and repeat speak the matching step', () async {
-      final h = _Harness(completed: false, granted: false);
+      final h = HomeControllerHarness(completed: false, granted: false);
       await h.start();
 
       await h.controller.onboardingNext();
@@ -268,7 +62,7 @@ void main() {
 
     test('finishing the last step saves it and then asks for the camera',
         () async {
-      final h = _Harness(completed: false, granted: false);
+      final h = HomeControllerHarness(completed: false, granted: false);
       await h.start();
 
       for (var i = 0; i < _steps.length; i++) {
@@ -291,7 +85,7 @@ void main() {
     });
 
     test('skipping says so and is remembered too', () async {
-      final h = _Harness(completed: false, granted: true);
+      final h = HomeControllerHarness(completed: false, granted: true);
       await h.start();
 
       await h.controller.onboardingNext();
@@ -317,7 +111,7 @@ void main() {
 
   group('later launches', () {
     test('greet briefly and open the camera without the guide', () async {
-      final h = _Harness(completed: true, granted: true);
+      final h = HomeControllerHarness(completed: true, granted: true);
       await h.start();
 
       expect(h.state.isOnboarding, isFalse);
@@ -331,7 +125,7 @@ void main() {
     });
 
     test('open the camera while the TTS engine is still starting', () async {
-      final h = _Harness(completed: true, granted: true);
+      final h = HomeControllerHarness(completed: true, granted: true);
       final engine = Completer<void>();
       h.tts.engineReady = engine.future;
       await h.start();
@@ -344,7 +138,7 @@ void main() {
     });
 
     test('queue the greeting ahead of the camera prompt', () async {
-      final h = _Harness(completed: true, granted: false);
+      final h = HomeControllerHarness(completed: true, granted: false);
       final engine = Completer<void>();
       h.tts.engineReady = engine.future;
       await h.start();
@@ -359,7 +153,7 @@ void main() {
     });
 
     test('replaying the guide does not ask for the camera again', () async {
-      final h = _Harness(completed: true, granted: true);
+      final h = HomeControllerHarness(completed: true, granted: true);
       await h.start();
 
       await h.controller.startOnboarding();
@@ -375,7 +169,7 @@ void main() {
     });
 
     test('live frames are ignored while the guide runs', () async {
-      final h = _Harness(completed: true, granted: true);
+      final h = HomeControllerHarness(completed: true, granted: true);
       await h.start();
       final onFrame = h.camera.onFrame!;
 

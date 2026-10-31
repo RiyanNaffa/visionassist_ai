@@ -29,10 +29,16 @@ const double _kNmsIouThreshold = 0.45;
 /// **Output tensor contract** (see `assets/models/README.md`):
 /// - Shape `[1, num_detections, 6]`
 /// - Each row: `[cx, cy, w, h, confidence, class_id]` (float32, normalised)
+///
+/// Inference runs on a background isolate ([IsolateInterpreter]). On the UI
+/// isolate a frame took long enough that a finger's down event waited past
+/// the 500 ms long-press timeout, so swipes in this mode were swallowed and
+/// the user could not switch modes.
 class TfliteCurrencyDetector implements CurrencyDetector {
   TfliteCurrencyDetector();
 
   Interpreter? _interpreter;
+  IsolateInterpreter? _isolateInterpreter;
   bool _available = false;
 
   /// Initialises the interpreter from the bundled TFLite asset.
@@ -42,6 +48,9 @@ class TfliteCurrencyDetector implements CurrencyDetector {
       // bundle key (with the `assets/` prefix declared in pubspec.yaml).
       _interpreter = await Interpreter.fromAsset(
         'assets/models/currency_detector.tflite',
+      );
+      _isolateInterpreter = await IsolateInterpreter.create(
+        address: _interpreter!.address,
       );
       _available = true;
 
@@ -61,121 +70,103 @@ class TfliteCurrencyDetector implements CurrencyDetector {
 
   @override
   Future<CurrencyDetectionResult> detect(Float32List input) async {
-    if (!_available || _interpreter == null) {
+    final isolateInterpreter = _isolateInterpreter;
+    if (!_available || _interpreter == null || isolateInterpreter == null) {
       return const CurrencyDetectionResult(detections: []);
     }
 
-    // Input tensor: [1, 256, 256, 3]
-    final inputNested = _buildInputNested(input);
-
-    // Read output shape dynamically to support both common YOLO export layouts:
-    //   A) [1, numDetections, 6]  — end-to-end (cx,cy,w,h,conf,cls)
-    //   B) [1, 84, numDetections] — Ultralytics default (transposed)
     final outputShape = _interpreter!.getOutputTensor(0).shape;
-
-    List<_RawDetection> candidates;
+    final output = Float32List(outputShape.fold(1, (a, b) => a * b));
     try {
-      if (outputShape.length == 3 && outputShape[2] == 6) {
-        // Layout A: [1, N, 6]
-        final numDetections = outputShape[1];
-        final outputBuffer = [
-          List.generate(numDetections, (_) => List<double>.filled(6, 0.0)),
-        ];
-        _interpreter!.runForMultipleInputs([inputNested], {0: outputBuffer});
-        candidates = _filterByConfidence(outputBuffer[0]);
-      } else if (outputShape.length == 3 && outputShape[1] >= 5) {
-        // Layout B: [1, (4+numClasses), N] — Ultralytics transposed
-        final numAttrs = outputShape[1]; // e.g. 4+7=11 for 7 classes
-        final numDetections = outputShape[2];
-        final outputBuffer = [
-          List.generate(
-              numAttrs, (_) => List<double>.filled(numDetections, 0.0)),
-        ];
-        _interpreter!.runForMultipleInputs([inputNested], {0: outputBuffer});
-        candidates =
-            _filterByConfidenceTransposed(outputBuffer[0], numDetections);
-      } else {
-        debugPrint(
-            '[CurrencyDetector] ⚠ Unexpected output shape: $outputShape');
-        return const CurrencyDetectionResult(detections: []);
-      }
+      // Raw bytes are copied into the [1, 256, 256, 3] tensor as they are; a
+      // nested List is converted number by number (~50 ms per frame on a PC,
+      // several times that on a phone).
+      await isolateInterpreter.run(
+        input.buffer.asUint8List(input.offsetInBytes, input.lengthInBytes),
+        output.buffer,
+      );
     } catch (e) {
       debugPrint('[CurrencyDetector] ❌ Inference error: $e');
       return const CurrencyDetectionResult(detections: []);
     }
-
-    final afterNms = _nonMaxSuppression(candidates);
-    final sorted = _sortByDenomination(afterNms);
-
-    return CurrencyDetectionResult(detections: sorted);
+    return decodeOutput(output, outputShape);
   }
 
   /// Releases interpreter resources.
-  void dispose() => _interpreter?.close();
+  void dispose() {
+    _isolateInterpreter?.close();
+    _interpreter?.close();
+  }
 
-  // ── Private helpers ──────────────────────────────────────────────────────
-
-  /// Reshapes flat Float32List into a nested `[1][256][256][3]` list.
-  List<List<List<List<double>>>> _buildInputNested(Float32List flat) {
-    const h = 256, w = 256, c = 3;
-    return List.generate(
-      1,
-      (_) => List.generate(
-        h,
-        (y) => List.generate(
-          w,
-          (x) => List.generate(
-            c,
-            (ch) => flat[(y * w + x) * c + ch].toDouble(),
-          ),
-        ),
-      ),
+  /// Turns the model's flat output tensor into detections: confidence
+  /// filter, per-class NMS, then sorted by denomination.
+  ///
+  /// Two YOLO export layouts are supported:
+  /// - A) `[1, N, 6]`: rows of `[cx, cy, w, h, confidence, class_id]`
+  ///   (end-to-end export, the bundled model).
+  /// - B) `[1, 4 + numClasses, N]`: Ultralytics' transposed layout, rows
+  ///   0–3 are `cx, cy, w, h` and the rest are per-class scores.
+  @visibleForTesting
+  static CurrencyDetectionResult decodeOutput(
+    Float32List output,
+    List<int> shape,
+  ) {
+    final List<_RawDetection> candidates;
+    if (shape.length == 3 && shape[2] == 6) {
+      candidates = _filterRows(output, shape[1]);
+    } else if (shape.length == 3 && shape[1] >= 5) {
+      candidates = _filterTransposed(output, shape[1], shape[2]);
+    } else {
+      debugPrint('[CurrencyDetector] ⚠ Unexpected output shape: $shape');
+      return const CurrencyDetectionResult(detections: []);
+    }
+    return CurrencyDetectionResult(
+      detections: _sortByDenomination(_nonMaxSuppression(candidates)),
     );
   }
 
-  /// Layout A: rows are `[cx, cy, w, h, confidence, class_id]`.
-  List<_RawDetection> _filterByConfidence(List<List<double>> rows) {
+  // ── Private helpers ──────────────────────────────────────────────────────
+
+  /// Layout A: [numDetections] rows of `[cx, cy, w, h, confidence, class_id]`.
+  static List<_RawDetection> _filterRows(Float32List out, int numDetections) {
     final result = <_RawDetection>[];
-    for (final row in rows) {
-      final conf = row[4];
+    for (var i = 0; i < numDetections; i++) {
+      final row = i * 6;
+      final conf = out[row + 4];
       if (conf < _kConfThreshold) continue;
-      final classIdx = row[5].round().clamp(0, _kClasses.length - 1);
       result.add(
         _RawDetection(
-          cx: row[0],
-          cy: row[1],
-          w: row[2],
-          h: row[3],
+          cx: out[row],
+          cy: out[row + 1],
+          w: out[row + 2],
+          h: out[row + 3],
           confidence: conf,
-          classIdx: classIdx,
+          classIdx: out[row + 5].round().clamp(0, _kClasses.length - 1),
         ),
       );
     }
     return result;
   }
 
-  /// Layout B (Ultralytics transposed): tensor is `[1, 4+numClasses, N]`.
+  /// Layout B (Ultralytics transposed): `numAttrs` rows of `numDetections`.
   ///
   /// Rows 0–3: cx, cy, w, h (normalised).
   /// Rows 4..4+numClasses-1: per-class raw scores (no sigmoid — max = conf).
-  List<_RawDetection> _filterByConfidenceTransposed(
-    List<List<double>> tensor, // shape: [numAttrs][numDetections]
+  static List<_RawDetection> _filterTransposed(
+    Float32List out,
+    int numAttrs,
     int numDetections,
   ) {
+    double at(int attr, int i) => out[attr * numDetections + i];
     final result = <_RawDetection>[];
-    final numClasses = _kClasses.length;
+    final numClasses = math.min(_kClasses.length, numAttrs - 4);
 
     for (var i = 0; i < numDetections; i++) {
-      final cx = tensor[0][i];
-      final cy = tensor[1][i];
-      final w = tensor[2][i];
-      final h = tensor[3][i];
-
       // Find the class with the highest score.
       var maxScore = 0.0;
       var maxCls = 0;
       for (var c = 0; c < numClasses; c++) {
-        final score = tensor[4 + c][i];
+        final score = at(4 + c, i);
         if (score > maxScore) {
           maxScore = score;
           maxCls = c;
@@ -185,10 +176,10 @@ class TfliteCurrencyDetector implements CurrencyDetector {
       if (maxScore < _kConfThreshold) continue;
       result.add(
         _RawDetection(
-          cx: cx,
-          cy: cy,
-          w: w,
-          h: h,
+          cx: at(0, i),
+          cy: at(1, i),
+          w: at(2, i),
+          h: at(3, i),
           confidence: maxScore,
           classIdx: maxCls,
         ),
@@ -198,7 +189,9 @@ class TfliteCurrencyDetector implements CurrencyDetector {
   }
 
   /// Greedy NMS: for each class independently, suppress overlapping boxes.
-  List<_RawDetection> _nonMaxSuppression(List<_RawDetection> detections) {
+  static List<_RawDetection> _nonMaxSuppression(
+    List<_RawDetection> detections,
+  ) {
     if (detections.isEmpty) return [];
 
     final kept = <_RawDetection>[];
@@ -226,7 +219,7 @@ class TfliteCurrencyDetector implements CurrencyDetector {
 
   /// Sorts detections by denomination value ascending, then by confidence
   /// descending so callers get a stable, readable list.
-  List<DetectedBanknote> _sortByDenomination(List<_RawDetection> raw) {
+  static List<DetectedBanknote> _sortByDenomination(List<_RawDetection> raw) {
     final list = raw.map((d) {
       return DetectedBanknote(
         classLabel: _kClasses[d.classIdx],
@@ -251,7 +244,7 @@ class TfliteCurrencyDetector implements CurrencyDetector {
   }
 
   /// Intersection-over-union of two detections (centre-format boxes).
-  double _iou(_RawDetection a, _RawDetection b) {
+  static double _iou(_RawDetection a, _RawDetection b) {
     final ax1 = a.cx - a.w / 2, ay1 = a.cy - a.h / 2;
     final ax2 = a.cx + a.w / 2, ay2 = a.cy + a.h / 2;
     final bx1 = b.cx - b.w / 2, by1 = b.cy - b.h / 2;

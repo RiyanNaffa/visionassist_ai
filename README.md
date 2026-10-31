@@ -80,6 +80,9 @@ welcome → how to hold the phone → the four modes → each mode → the remai
 ### Currency detector (mode 2)
 
 - Model: `assets/models/currency_detector.tflite` — YOLO, input `[1, 256, 256, 3]` float32 0–1 RGB, output `[1, 300, 6]` (`cx, cy, w, h, confidence, class`). Both `[1, N, 6]` and Ultralytics-transposed `[1, 4+C, N]` layouts are handled.
+- Frame conversion (`Isolate.run`) and inference (`IsolateInterpreter`, raw-byte input) run off the UI isolate. On it,
+  a frame took long enough that swipes turned into long presses and the mode could not be changed.
+- A detection that finishes after the user switched modes is dropped, so it never talks over "Mode diubah ke …".
 - Confidence ≥ 0.50, per-class NMS at IoU 0.45; seven classes: `1000, 2000, 5000, 10000, 20000, 50000, 100000`.
 - Several banknotes in one frame are announced together in ascending order ("Seribu Rupiah, Dua ribu Rupiah"); a new announcement is made only when the **set** of denominations changes.
 - No model file → `UnavailableCurrencyDetector` announces once that the model is missing; no crash.
@@ -421,7 +424,8 @@ flutter test --coverage
 | RgbConverter | `test/unit/rgb_converter_test.dart` |
 | Ingredient parser | `test/unit/ingredient_parser_test.dart` |
 | QA safety rules, refusal phrases, general questions | `test/unit/qa_safety_test.dart` |
-| Banknote detector | `test/unit/banknote_detector_test.dart` |
+| Banknote detector, YOLO output decoding (both layouts, NMS) | `test/unit/banknote_detector_test.dart` |
+| Currency mode: announcements, stale detections after a mode switch | `test/unit/currency_mode_test.dart` |
 | Backend HTTP client | `test/unit/proxy_client_test.dart` |
 | Remote Q&A + fallback | `test/unit/remote_qa_repository_test.dart` |
 | Remote ingredient summary + client guard | `test/unit/remote_ingredient_repository_test.dart` |

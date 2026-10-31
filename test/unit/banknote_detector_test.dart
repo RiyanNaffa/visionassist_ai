@@ -2,7 +2,7 @@ import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:visionassist_ai/features/currency_detector/data/tflite_currency_detector.dart'
-    show UnavailableCurrencyDetector;
+    show TfliteCurrencyDetector, UnavailableCurrencyDetector;
 import 'package:visionassist_ai/features/currency_detector/domain/entities/currency_detection.dart';
 
 /// Tests untuk domain entities (tanpa TFLite runtime).
@@ -165,6 +165,65 @@ void main() {
 
     test('all 7 IDR classes have a spoken form', () {
       expect(speechMap.length, 7);
+    });
+  });
+
+  // ── Output decoding (no TFLite runtime needed) ────────────────────────────
+
+  group('TfliteCurrencyDetector.decodeOutput', () {
+    const decode = TfliteCurrencyDetector.decodeOutput;
+
+    /// Layout A: rows of [cx, cy, w, h, confidence, class_id].
+    Float32List rows(List<List<double>> r) =>
+        Float32List.fromList([for (final row in r) ...row]);
+
+    test('layout A keeps confident rows, sorted by denomination', () {
+      final out = rows([
+        [0.5, 0.5, 0.2, 0.1, 0.90, 4], // 20000
+        [0.2, 0.2, 0.2, 0.1, 0.30, 1], // below the threshold
+        [0.8, 0.8, 0.2, 0.1, 0.70, 0], // 1000
+      ]);
+
+      final result = decode(out, [1, 3, 6]);
+
+      expect(result.detections.map((d) => d.classLabel), ['1000', '20000']);
+      expect(result.detections.last.confidence, closeTo(0.9, 1e-6));
+      expect(result.detections.last.cx, closeTo(0.5, 1e-6));
+    });
+
+    test('layout A suppresses an overlapping box of the same class', () {
+      final out = rows([
+        [0.50, 0.50, 0.4, 0.2, 0.90, 4],
+        [0.51, 0.50, 0.4, 0.2, 0.80, 4], // same note, lower confidence
+        [0.10, 0.10, 0.1, 0.1, 0.60, 4], // a second note
+      ]);
+
+      final result = decode(out, [1, 3, 6]);
+
+      expect(result.detections, hasLength(2));
+      expect(result.detections.first.confidence, closeTo(0.9, 1e-6));
+    });
+
+    test('layout B (transposed) takes the best class score', () {
+      const n = 2; // detections; 4 box values + 7 class scores each
+      final out = Float32List((4 + 7) * n);
+      void put(int attr, int i, double v) => out[attr * n + i] = v;
+      put(0, 0, 0.5);
+      put(1, 0, 0.5);
+      put(2, 0, 0.3);
+      put(3, 0, 0.2);
+      put(4 + 0, 0, 0.1);
+      put(4 + 5, 0, 0.8); // 50000
+      put(4 + 2, 1, 0.4); // below the threshold
+
+      final result = decode(out, [1, 4 + 7, n]);
+
+      expect(result.detections.single.classLabel, '50000');
+      expect(result.detections.single.cx, closeTo(0.5, 1e-6));
+    });
+
+    test('an unexpected shape gives no detections', () {
+      expect(decode(Float32List(4), [1, 4]).hasDetections, isFalse);
     });
   });
 }
